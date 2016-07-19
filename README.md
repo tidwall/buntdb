@@ -36,7 +36,7 @@ Features
 - Flexible [iteration](#iterating) of data; ascending, descending, and ranges
 - Durable append-only file format. Adopts the [Redis AOF](http://redis.io/topics/persistence) process
 - Option to evict old items with an [expiration](#data-expiration) TTL
-- Tight codebase, under 1K loc using the `cloc` command.
+- Tight codebase, under 1K loc using the `cloc` command
 - ACID semantics with locking [transactions](#transactions) that support rollbacks
 
 Getting Started
@@ -78,8 +78,6 @@ func main() {
 	... 
 }
 ```
-
-It's important to note that BuntDB does not currently support file locking, so avoid accessing the database from multiple processes.
 
 ## Transactions
 All reads and writes must be performed from inside a transaction. BuntDB can have one write transaction opened at a time, but can have many concurrent read transactions. Each transaction maintains a stable view of the database. In other words, once a transaction has begun, the data for that transaction cannot be changed by other transactions.
