@@ -31,7 +31,7 @@ Features
 - In-memory database for [fast reads and writes](https://github.com/tidwall/raft-boltdb#benchmarks)
 - Embeddable with a [simple API](https://godoc.org/github.com/tidwall/buntdb)
 - [Spatial indexing](#spatial-indexes) for up to 4 dimensions; Useful for Geospatial data
-- - Create [custom indexes](#custom-indexes) for any data type
+- Create [custom indexes](#custom-indexes) for any data type
 - [Built-in types](#built-in-types) that are easy to get up & running; String, Uint, Int, Float
 - Flexible [iteration](#iterating) of data; ascending, descending, and ranges
 - Durable append-only file format. Adopts the [Redis AOF](http://redis.io/topics/persistence) process
