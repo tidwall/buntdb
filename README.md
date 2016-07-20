@@ -31,12 +31,12 @@ Features
 - In-memory database for [fast reads and writes](https://github.com/tidwall/raft-boltdb#benchmarks)
 - Embeddable with a [simple API](https://godoc.org/github.com/tidwall/buntdb)
 - [Spatial indexing](#spatial-indexes) for up to 4 dimensions; Useful for Geospatial data
-- - Create [custom indexes](#custom-indexes) for any data type
+- Create [custom indexes](#custom-indexes) for any data type
 - [Built-in types](#built-in-types) that are easy to get up & running; String, Uint, Int, Float
 - Flexible [iteration](#iterating) of data; ascending, descending, and ranges
 - Durable append-only file format. Adopts the [Redis AOF](http://redis.io/topics/persistence) process
 - Option to evict old items with an [expiration](#data-expiration) TTL
-- Tight codebase, under 1K loc using the `cloc` command.
+- Tight codebase, under 1K loc using the `cloc` command
 - ACID semantics with locking [transactions](#transactions) that support rollbacks
 
 Getting Started
@@ -78,8 +78,6 @@ func main() {
 	... 
 }
 ```
-
-It's important to note that BuntDB does not currently support file locking, so avoid accessing the database from multiple processes.
 
 ## Transactions
 All reads and writes must be performed from inside a transaction. BuntDB can have one write transaction opened at a time, but can have many concurrent read transactions. Each transaction maintains a stable view of the database. In other words, once a transaction has begun, the data for that transaction cannot be changed by other transactions.
@@ -256,7 +254,7 @@ user:4:name 63
 ```
 
 ### Spatial Indexes
-BuntDB has support for spatial indexes by storing rectangles in an [R-tree](https://en.wikipedia.org/wiki/R-tree). An R-tree is organized in a similar manner as a [B-tree](https://en.wikipedia.org/wiki/B-tree), and both are balanaced trees. But, an R-tree is special because it can operate on data that is in multiple dimensions. This is super handy for Geospatial applications.
+BuntDB has support for spatial indexes by storing rectangles in an [R-tree](https://en.wikipedia.org/wiki/R-tree). An R-tree is organized in a similar manner as a [B-tree](https://en.wikipedia.org/wiki/B-tree), and both are balanced trees. But, an R-tree is special because it can operate on data that is in multiple dimensions. This is super handy for Geospatial applications.
 
 To create a spatial index use the `CreateSpatialIndex` function:
 
