@@ -34,7 +34,7 @@ Features
 - Create [custom indexes](#custom-indexes) for any data type
 - [Built-in types](#built-in-types) that are easy to get up & running; String, Uint, Int, Float
 - Flexible [iteration](#iterating) of data; ascending, descending, and ranges
-- Durable append-only file format. Adopts the [Redis AOF](http://redis.io/topics/persistence) process
+- [Durable append-only file](#append-only-file) format. Similar to [Redis AOF](http://redis.io/topics/persistence)
 - Option to evict old items with an [expiration](#data-expiration) TTL
 - Tight codebase, under 1K loc using the `cloc` command
 - ACID semantics with locking [transactions](#transactions) that support rollbacks
@@ -303,6 +303,36 @@ db.Update(func(tx *buntdb.Tx) error {
 ```
 
 Now `mykey` will automatically be deleted after one second. You can remove the TTL by setting the value again with the same key/value, but with the options parameter set to nil.
+
+## Append-only File
+
+BuntDB uses an AOF (append-only file) which is a log of all database changes that occur from operations like `Set()` and `Delete()`. 
+
+The format of this file looks like:
+```
+set key:1 value1
+set key:2 value2
+set key:1 value3
+del key:2
+...
+```
+
+When the database opens again, it will read back the aof file and process each command in exact order. This read process happens one time when the database opens. From there on the file is only appended.
+
+As you may guess this log file can grow large over time. There is a `Shrink()` function which will rewrite the aof file so that it contains only the items in the database. The shrink operation does not lock up the database so read and write transactions can continue while shrinking is in process.
+
+Also there's the database config setting `Config.AutoShrink` which is used to allow for shrinking to be self-managed. This value is set to a multiple that represents how many more entries in the aof file versus the number of items in memory. For example; If this value is set to 10 and the number of item in memory is 150,000, then the database will automatically shrink when the aof file has 1,500,000 lines in it. Currently default value is 5, but this may change in a future release. Autoshink can be disabled by setting this value to zero.
+
+### Durability and fsync
+
+BuntDB executes an `fsync` once every second on the [aof file](#append-only-file). Which simply means that there's a chance that up to 1 second of data might be lost. The likelyhood of this happening is dependent on a lot of factors, but suffice to say this may not be good enough for environments that require very high durability. 
+
+There's the optional database config setting `Config.SyncPolicy` which can be set to 
+
+- `Never` - fsync is managed by the operating system, less safe
+- `EverySecond` - fsync every second, fast and safer, this is the default
+- `Always` - fsync after every write, very durable, very slow
+
 
 ## Contact
 Josh Baker [@tidwall](http://twitter.com/tidwall)
