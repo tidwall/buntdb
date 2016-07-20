@@ -821,3 +821,57 @@ func TestTTL(t *testing.T) {
 		return nil
 	})
 }
+
+func TestConfig(t *testing.T) {
+	os.RemoveAll("data.db")
+	db, err := Open("data.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll("data.db")
+	defer db.Close()
+
+	err = db.SetConfig(Config{AutoShrink: -1})
+	if err == nil {
+		t.Fatal("expecting a config autoshrink error")
+	}
+	err = db.SetConfig(Config{AutoShrink: 1})
+	if err == nil {
+		t.Fatal("expecting a config autoshrink error")
+	}
+	err = db.SetConfig(Config{AutoShrink: 0})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 2; i < 50; i++ {
+		err = db.SetConfig(Config{AutoShrink: i})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	err = db.SetConfig(Config{SyncPolicy: SyncPolicy(-1)})
+	if err == nil {
+		t.Fatal("expecting a config syncpolicy error")
+	}
+	err = db.SetConfig(Config{SyncPolicy: SyncPolicy(3)})
+	if err == nil {
+		t.Fatal("expecting a config syncpolicy error")
+	}
+	err = db.SetConfig(Config{SyncPolicy: Never})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.SetConfig(Config{SyncPolicy: EverySecond})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.SetConfig(Config{AutoShrink: 6, SyncPolicy: Always})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c := db.Config()
+	if c.AutoShrink != 6 || c.SyncPolicy != Always {
+		t.Fatalf("expecting %v and %v, got %v and %v", 6, Always, c.AutoShrink, c.SyncPolicy)
+	}
+}

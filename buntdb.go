@@ -38,6 +38,10 @@ var (
 	ErrIndexExists = errors.New("index exists")
 	// ErrInvalidOperation is returned when an operation cannot be completed.
 	ErrInvalidOperation = errors.New("invalid operation")
+	// ErrInvalidAutoShrink is returned for an invalid AutoShrink value.
+	ErrInvalidAutoShrink = errors.New("invalid autoshink")
+	// ErrInvalidSyncPolicy is returned for an invalid SyncPolicy value.
+	ErrInvalidSyncPolicy = errors.New("invalid sync policy")
 )
 
 // Iterator allows callers of Ascend* or Descend* to iterate in-order
@@ -59,6 +63,43 @@ type DB struct {
 	flushes int               // a count of the number of disk flushes
 	closed  bool              // set when the database has been closed
 	aoflen  int               // the number of lines in the aof file
+	config  Config            // the database configuration
+}
+
+// SyncPolicy represents how often data is synced to disk.
+type SyncPolicy int
+
+const (
+	// Never is used to disable syncing data to disk.
+	// The faster and less safe method.
+	Never SyncPolicy = 0
+	// EverySecond is used to sync data to disk every second.
+	// It's pretty fast and you can lose 1 second of data if there
+	// is a disaster.
+	// This is the recommended setting.
+	EverySecond = 1
+	// Always is used to sync data after every write to disk.
+	// Very very slow. Very safe.
+	Always = 2
+)
+
+// Config represents database configuration options. These
+// options are used to change various behaviors of the database.
+type Config struct {
+	// SyncPolicy adjusts how often the data is synced to disk.
+	// This value can be Never, EverySecond, or Always.
+	// The default is EverySecond.
+	SyncPolicy SyncPolicy
+	// AutoShrink will automatically resize the database file on disk
+	// when it gets too large. The value represents a multiple of
+	// the maximum number of entries that can exist on disk before
+	// an automatic resize occurs.
+	// For example, a value of 2 means that the number of entries on
+	// disk may be up to 2x the number of items on disk.
+	// A zero value will disable auto shrinking.
+	// A negative value or 1 are invalid.
+	// The default is value is 5.
+	AutoShrink int
 }
 
 // exctx is a simple b-tree context for ordering by expiration.
@@ -73,6 +114,10 @@ func Open(path string) (*DB, error) {
 	db.keys = btree.New(16, nil)
 	db.exps = btree.New(16, &exctx{db})
 	db.idxs = make(map[string]*index)
+	db.config = Config{
+		SyncPolicy: EverySecond,
+		AutoShrink: 5,
+	}
 	var err error
 	// Hardcoding 0666 as the default mode.
 	db.file, err = os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0666)
@@ -259,6 +304,29 @@ func (db *DB) Indexes() ([]string, error) {
 	return names, nil
 }
 
+// Config returns the database configuration.
+func (db *DB) Config() Config {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+	return db.config
+}
+
+// SetConfig updates the database configuration.
+func (db *DB) SetConfig(config Config) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	if config.AutoShrink < 0 || config.AutoShrink == 1 {
+		return ErrInvalidAutoShrink
+	}
+	switch config.SyncPolicy {
+	default:
+		return ErrInvalidSyncPolicy
+	case Never, EverySecond, Always:
+	}
+	db.config = config
+	return nil
+}
+
 // insertIntoDatabase performs inserts an item in to the database and updates
 // all indexes. If a previous item with the same key already exists, that item
 // will be replaced with the new one, and return the previous item.
@@ -344,6 +412,7 @@ func (db *DB) backgroundManager() {
 	for range t.C {
 		stop := false
 		multiple := 0
+		autoshink := 0
 		// Open a standard view. This will take a full lock of the
 		// database thus allowing for access to anything we need.
 		db.Update(func(tx *Tx) error {
@@ -352,6 +421,7 @@ func (db *DB) backgroundManager() {
 				stop = true
 				return nil
 			}
+			autoshink = db.config.AutoShrink
 			if db.keys.Len() > 0 {
 				multiple = db.aoflen / db.keys.Len()
 			}
@@ -373,18 +443,19 @@ func (db *DB) backgroundManager() {
 					}
 				}
 			}
+
 			// execute a disk sync.
-			if flushes != db.flushes {
+			if db.config.SyncPolicy == EverySecond && flushes != db.flushes {
 				db.file.Sync()
 				flushes = db.flushes
 			}
 			return nil
 		})
-		if multiple > 4 {
-			db.Shrink()
-		}
 		if stop {
 			break
+		}
+		if multiple >= autoshink && autoshink > 1 {
+			db.Shrink()
 		}
 	}
 }
@@ -789,9 +860,13 @@ func (tx *Tx) commit() error {
 		if err = tx.db.bufw.Flush(); err != nil {
 			tx.rollbackInner()
 		}
+		if tx.db.config.SyncPolicy == Always {
+			tx.db.file.Sync()
+		}
 		// Increment the number of flushes. The background syncing uses this.
 		tx.db.flushes++
 		tx.db.aoflen += len(tx.commits)
+
 	}
 	// Unlock the database and allow for another writable transaction.
 	tx.unlock()
