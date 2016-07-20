@@ -388,6 +388,8 @@ func (db *DB) backgroundManager() {
 		}
 	}
 }
+
+// Shrink function description [here]
 func (db *DB) Shrink() error {
 	db.mu.Lock()
 	if db.closed {
@@ -470,7 +472,7 @@ func (db *DB) Shrink() error {
 		if _, err := aof.Seek(endpos, 0); err != nil {
 			return err
 		}
-		// Just copy all of the new commands that have occured since we
+		// Just copy all of the new commands that have occurred since we
 		// started the shrink process.
 		if _, err := io.Copy(f, aof); err != nil {
 			return err
@@ -920,13 +922,13 @@ type SetOptions struct {
 }
 
 // Set inserts or replaces an item in the database based on the key.
-// The opt params may be used for addtional functionality such as forcing
+// The opt params may be used for additional functionality such as forcing
 // the item to be evicted at a specified time. When the return value
-// for err is nil the operation succeded. When the return value of
+// for err is nil the operation succeeded. When the return value of
 // replaced is true, then the operaton replaced an existing item whose
 // value will be returned through the previousValue variable.
 // The results of this operation will not be available to other
-// transactions until the current transaction has successfully commited.
+// transactions until the current transaction has successfully committed.
 func (tx *Tx) Set(key, value string, opts *SetOptions) (previousValue string,
 	replaced bool, err error) {
 	if tx.db == nil {
