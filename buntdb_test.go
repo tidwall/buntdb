@@ -789,3 +789,35 @@ func TestRectStrings(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestTTL(t *testing.T) {
+	os.RemoveAll("data.db")
+	db, err := Open("data.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll("data.db")
+	defer db.Close()
+	db.Update(func(tx *Tx) error {
+		tx.Set("key1", "val1", &SetOptions{Expires: true, TTL: time.Second})
+		tx.Set("key2", "val2", nil)
+		return nil
+	})
+	db.View(func(tx *Tx) error {
+		dur1, err := tx.TTL("key1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if dur1 > time.Second || dur1 <= 0 {
+			t.Fatalf("expecting between zero and one second, got '%v'", dur1)
+		}
+		dur1, err = tx.TTL("key2")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if dur1 >= 0 {
+			t.Fatalf("expecting a negative value, got '%v'", dur1)
+		}
+		return nil
+	})
+}

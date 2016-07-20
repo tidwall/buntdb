@@ -683,6 +683,15 @@ func (db *DB) Update(fn func(tx *Tx) error) error {
 	return db.managed(true, fn)
 }
 
+// get return an item or nil if not found.
+func (db *DB) get(key string) *dbItem {
+	item := db.keys.Get(&dbItem{key: key})
+	if item != nil {
+		return item.(*dbItem)
+	}
+	return nil
+}
+
 // Tx represents a transaction on the database. This transaction can either be
 // read-only or read/write. Read-only transactions can be used for retrieving
 // values for keys and iterating through keys and values. Read/write
@@ -975,11 +984,10 @@ func (tx *Tx) Get(key string) (val string, err error) {
 	if tx.db == nil {
 		return "", ErrTxClosed
 	}
-	prev := tx.db.keys.Get(&dbItem{key: key})
-	if prev == nil {
+	item := tx.db.get(key)
+	if item == nil {
 		return "", ErrNotFound
 	}
-	item := prev.(*dbItem)
 	if item.expired() {
 		// The item exists in the tree, but has expired. Let's assume that
 		// the caller is only interested in items that have not expired.
@@ -1014,6 +1022,26 @@ func (tx *Tx) Delete(key string) (val string, err error) {
 		return "", ErrNotFound
 	}
 	return item.val, nil
+}
+
+// TTL returns the remaining time-to-live for an item.
+// A negative duration will be returned for items that do not have an
+// expiration.
+func (tx *Tx) TTL(key string) (time.Duration, error) {
+	if tx.db == nil {
+		return 0, ErrTxClosed
+	}
+	item := tx.db.get(key)
+	if item == nil {
+		return 0, ErrNotFound
+	} else if item.opts == nil || !item.opts.ex {
+		return -1, nil
+	}
+	dur := item.opts.exat.Sub(time.Now())
+	if dur < 0 {
+		return 0, ErrNotFound
+	}
+	return dur, nil
 }
 
 // scan iterates through a specified index and calls user-defined iterator
