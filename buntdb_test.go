@@ -87,7 +87,7 @@ func TestVariousTx(t *testing.T) {
 		t.Fatal("a rollbacked transaction got through")
 	}
 	if val != "planet" {
-		t.Fatal("expecting '%v', got '%v'", "planet", val)
+		t.Fatalf("expecting '%v', got '%v'", "planet", val)
 	}
 	if err := db.Update(func(tx *Tx) error {
 		tx.db = nil
@@ -327,7 +327,7 @@ func TestVariousTx(t *testing.T) {
 			t.Fatal(err)
 		}
 		if n != 5 {
-			t.Fatal("expecting %v, got %v", 5, n)
+			t.Fatalf("expecting %v, got %v", 5, n)
 		}
 		tx.db = nil
 		_, err = tx.Len()
