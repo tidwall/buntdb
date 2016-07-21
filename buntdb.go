@@ -183,8 +183,9 @@ func (db *DB) CreateIndex(name, pattern string,
 //
 // The rect function converts a string to a rectangle. The rectangle is
 // represented by two arrays, min and max. Both arrays may have a length
-// between 1 and 4, and both arrays must match in length. A length of 1 is a
+// between 1 and 20, and both arrays must match in length. A length of 1 is a
 // one dimensional rectangle, and a length of 4 is a four dimension rectangle.
+// There is support for up to 20 dimensions.
 // The values of min must be less than the values of max at the same dimension.
 // Thus min[0] must be less-than-or-equal-to max[0].
 // The IndexRect is a default function that can be used for the rect
