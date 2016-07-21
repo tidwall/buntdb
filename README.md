@@ -23,7 +23,7 @@ both as a performant [Raft Store](https://github.com/tidwall/raft-boltdb),
 and a Geospatial database.
 
 Much of the API is inspired by the fantastic [BoltDB](https://github.com/boltdb/bolt),
-an amazing key/value store that can handle terrabytes of data on disk.
+an amazing key/value store that can handle terabytes of data on disk.
 
 Features
 ========
@@ -84,7 +84,7 @@ All reads and writes must be performed from inside a transaction. BuntDB can hav
 
 Transactions run in a function that exposes a `Tx` object, which represents the transaction state. While inside a transaction, all database operations should be performed using this object. You should never access the origin `DB` object while inside a transaction. Doing so may have side-effects, such as blocking your application.
 
-When a transaction fails, it will roll back, and revert all chanages that ocurred to the database during that transaction. There's a single return value that you can use to close the transaction. For read/write transactions, returning an error this way will force the transaction to roll back. When a read/write transaction succeeds all changes are persisted to disk.
+When a transaction fails, it will roll back, and revert all changes that occurred to the database during that transaction. There's a single return value that you can use to close the transaction. For read/write transactions, returning an error this way will force the transaction to roll back. When a read/write transaction succeeds all changes are persisted to disk.
 
 ### Read-only Transactions
 A read-only transaction should be used when you don't need to make changes to the data. The advantage of a read-only transaction is that there can be many running concurrently.
@@ -108,7 +108,7 @@ err := db.Update(func(tx *buntdb.Tx) error {
 
 ## Setting and getting key/values
 
-To set a value you must open a read/write tranasction:
+To set a value you must open a read/write transaction:
 
 ```go
 err := db.Update(func(tx *buntdb.Tx) error {
@@ -289,7 +289,7 @@ db.View(func(tx *buntdb.Tx) error {
 
 This will get all three positions.
 
-The bracket syntax `[-117 30],[-112 36]` is unique to BuntDB, and it's how the built-in rectangles are processed, but you are not limited to this syntax. Whatever Rect function you choose to use during `CreateSpatialIndex` will be used to process the paramater, in this case it's `IndexRect`.
+The bracket syntax `[-117 30],[-112 36]` is unique to BuntDB, and it's how the built-in rectangles are processed, but you are not limited to this syntax. Whatever Rect function you choose to use during `CreateSpatialIndex` will be used to process the parameter, in this case it's `IndexRect`.
 
 
 ### Data Expiration
@@ -325,7 +325,7 @@ Also there's the database config setting `Config.AutoShrink` which is used to al
 
 ### Durability and fsync
 
-BuntDB executes an `fsync` once every second on the [aof file](#append-only-file). Which simply means that there's a chance that up to 1 second of data might be lost. The likelyhood of this happening is dependent on a lot of factors, but suffice to say this may not be good enough for environments that require very high durability. 
+BuntDB executes an `fsync` once every second on the [aof file](#append-only-file). Which simply means that there's a chance that up to 1 second of data might be lost. The likelihood of this happening is dependent on a lot of factors, but suffice to say this may not be good enough for environments that require very high durability. 
 
 There's the optional database config setting `Config.SyncPolicy` which can be set to 
 
