@@ -289,8 +289,26 @@ db.View(func(tx *buntdb.Tx) error {
 
 This will get all three positions.
 
+#### Spatial bracket syntax
+
 The bracket syntax `[-117 30],[-112 36]` is unique to BuntDB, and it's how the built-in rectangles are processed, but you are not limited to this syntax. Whatever Rect function you choose to use during `CreateSpatialIndex` will be used to process the parameter, in this case it's `IndexRect`.
 
+- **2D rectangle:** `[10 15],[20 25]`  
+*Min XY: "10x15", Max XY: "20x25"*
+
+- **3D rectangle:** `[10 15 12],[20 25 18]`  
+*Min XYZ: "10x15x12", Max XYZ: "20x25x18"*
+
+- **2D point:** `[10 15 12]`  
+*XY: "10x15"*
+
+- **LatLon point:** `[-112.2693 33.5123]`  
+*LatLon: "33.5123 -112.2693"*
+
+- **LatLon bounding box:** `[-112.26 33.51],[-112.18 33.67]`  
+*Min LatLon: "33.51 -112.26", Max LatLon: "33.67 -112.18"*
+
+**Notice:** The longitude is the Y axis and is on the left, and latitude is the X axis and is on the right.
 
 ### Data Expiration
 Items can be automatically evicted by using the `SetOptions` object in the `Set` function to set a `TTL`.
