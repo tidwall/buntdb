@@ -149,7 +149,7 @@ There is also `AscendGreaterOrEqual`, `AscendLessThan`, `AscendRange`, `Descend`
 
 
 ## Custom Indexes
-Initially all data is stored in a single [B-tree](https://en.wikipedia.org/wiki/B-tree) with each item having one key and one value. All of these items are ordered by the key. This is great for quickly getting a value from a key or [iterating](#iterating) over the keys. Feel free to take a peruse at the [B-tree implementation](https://github.com/tidwall/btree) that BuntDB uses.
+Initially all data is stored in a single [B-tree](https://en.wikipedia.org/wiki/B-tree) with each item having one key and one value. All of these items are ordered by the key. This is great for quickly getting a value from a key or [iterating](#iterating) over the keys. Feel free to peruse the [B-tree implementation](https://github.com/tidwall/btree).
 
 You can also create custom indexes that allow for ordering and [iterating](#iterating) over values. A custom index also uses a B-tree, but it's more flexible because it allows for custom ordering.
 
