@@ -25,21 +25,29 @@ var (
 	// ErrTxNotWritable is returned when performing a write operation on a
 	// read-only transaction.
 	ErrTxNotWritable = errors.New("tx not writable")
+
 	// ErrTxClosed is returned when committing or rolling back a transaction
 	// that has already been committed or rolled back.
 	ErrTxClosed = errors.New("tx closed")
+
 	// ErrNotFound is returned when an item or index is not in the database.
 	ErrNotFound = errors.New("not found")
+
 	// ErrInvalid is returned when the database file is an invalid format.
 	ErrInvalid = errors.New("invalid database")
+
 	// ErrDatabaseClosed is returned when the database is closed.
 	ErrDatabaseClosed = errors.New("database closed")
+
 	// ErrIndexExists is returned when an index already exists in the database.
 	ErrIndexExists = errors.New("index exists")
+
 	// ErrInvalidOperation is returned when an operation cannot be completed.
 	ErrInvalidOperation = errors.New("invalid operation")
+
 	// ErrInvalidAutoShrink is returned for an invalid AutoShrink value.
 	ErrInvalidAutoShrink = errors.New("invalid autoshink")
+
 	// ErrInvalidSyncPolicy is returned for an invalid SyncPolicy value.
 	ErrInvalidSyncPolicy = errors.New("invalid sync policy")
 )
@@ -64,6 +72,7 @@ type DB struct {
 	closed  bool              // set when the database has been closed
 	aoflen  int               // the number of lines in the aof file
 	config  Config            // the database configuration
+	persist bool              // do we write to disk
 }
 
 // SyncPolicy represents how often data is synced to disk.
@@ -118,17 +127,20 @@ func Open(path string) (*DB, error) {
 		SyncPolicy: EverySecond,
 		AutoShrink: 5,
 	}
-	var err error
-	// Hardcoding 0666 as the default mode.
-	db.file, err = os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0666)
-	if err != nil {
-		return nil, err
+	db.persist = path != ":memory:"
+	if db.persist {
+		var err error
+		// Hardcoding 0666 as the default mode.
+		db.file, err = os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0666)
+		if err != nil {
+			return nil, err
+		}
+		if err := db.load(); err != nil {
+			db.file.Close()
+			return nil, err
+		}
+		db.bufw = bufio.NewWriter(db.file)
 	}
-	if err := db.load(); err != nil {
-		db.file.Close()
-		return nil, err
-	}
-	db.bufw = bufio.NewWriter(db.file)
 	// start the background manager.
 	go db.backgroundManager()
 	return db, nil
@@ -143,7 +155,10 @@ func (db *DB) Close() error {
 		return ErrDatabaseClosed
 	}
 	db.closed = true
-	return db.file.Close()
+	if db.persist {
+		return db.file.Close()
+	}
+	return nil
 }
 
 // index represents a b-tree or r-tree index and also acts as the
@@ -446,7 +461,8 @@ func (db *DB) backgroundManager() {
 			}
 
 			// execute a disk sync.
-			if db.config.SyncPolicy == EverySecond && flushes != db.flushes {
+			if db.persist && db.config.SyncPolicy == EverySecond &&
+				flushes != db.flushes {
 				db.file.Sync()
 				flushes = db.flushes
 			}
@@ -461,12 +477,19 @@ func (db *DB) backgroundManager() {
 	}
 }
 
-// Shrink function description [here]
+// Shrink will make the database file smaller by removing redundent
+// log entries. This operation does not block the database.
 func (db *DB) Shrink() error {
 	db.mu.Lock()
 	if db.closed {
 		db.mu.Unlock()
 		return ErrDatabaseClosed
+	}
+	if !db.persist {
+		// The database was opened with ":memory:" as the path.
+		// There is no persistence, and no need to do anything here.
+		db.mu.Unlock()
+		return nil
 	}
 	fname := db.file.Name()
 	tmpname := fname + ".tmp"
@@ -792,7 +815,9 @@ func (db *DB) begin(writable bool) (*Tx, error) {
 	}
 	if writable {
 		tx.rollbacks = make(map[string]*dbItem)
-		tx.commits = make(map[string]*dbItem)
+		if db.persist {
+			tx.commits = make(map[string]*dbItem)
+		}
 	}
 	tx.lock()
 	if db.closed {
@@ -846,7 +871,7 @@ func (tx *Tx) commit() error {
 		return ErrTxNotWritable
 	}
 	var err error
-	if len(tx.commits) > 0 {
+	if tx.db.persist && len(tx.commits) > 0 {
 		// Each committed record is written to disk
 		for key, item := range tx.commits {
 			if item == nil {
@@ -1050,7 +1075,9 @@ func (tx *Tx) Set(key, value string, opts *SetOptions) (previousValue string,
 	}
 	// For commits we simply assign the item to the map. We use this map to
 	// write the entry to disk.
-	tx.commits[key] = item
+	if tx.db.persist {
+		tx.commits[key] = item
+	}
 	return previousValue, replaced, nil
 }
 
@@ -1089,7 +1116,9 @@ func (tx *Tx) Delete(key string) (val string, err error) {
 	if _, ok := tx.rollbacks[key]; !ok {
 		tx.rollbacks[key] = item
 	}
-	tx.commits[key] = nil
+	if tx.db.persist {
+		tx.commits[key] = nil
+	}
 	// Even though the item has been deleted, we still want to check
 	// if it has expired. An expired item should not be returned.
 	if item.expired() {

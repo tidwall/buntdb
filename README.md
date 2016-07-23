@@ -79,6 +79,12 @@ func main() {
 }
 ```
 
+It's also possible to open a database that does not persist to disk by using `:memory:` as the path of the file.
+
+```go
+buntdb.Open(":memory:") // Open a file that does not persist to disk.
+```
+
 ## Transactions
 All reads and writes must be performed from inside a transaction. BuntDB can have one write transaction opened at a time, but can have many concurrent read transactions. Each transaction maintains a stable view of the database. In other words, once a transaction has begun, the data for that transaction cannot be changed by other transactions.
 
