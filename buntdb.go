@@ -156,8 +156,13 @@ func (db *DB) Close() error {
 	}
 	db.closed = true
 	if db.persist {
-		return db.file.Close()
+		if err := db.file.Close(); err != nil {
+			return err
+		}
 	}
+	// Let's release all references to nil. This will help both with debugging
+	// late usage panics and it provides a hint to the garbage collector
+	db.keys, db.exps, db.idxs, db.file, db.bufw = nil, nil, nil, nil, nil
 	return nil
 }
 
@@ -217,13 +222,13 @@ func (db *DB) createIndex(
 	less func(a, b string) bool,
 	rect func(item string) (min, max []float64),
 ) error {
-	if name == "" {
-		return ErrIndexExists
-	}
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	if db.closed {
 		return ErrDatabaseClosed
+	}
+	if name == "" {
+		return ErrIndexExists
 	}
 	if _, ok := db.idxs[name]; ok {
 		return ErrIndexExists
@@ -290,13 +295,13 @@ func deepMatch(str, pattern string) bool {
 
 // DropIndex removes an index.
 func (db *DB) DropIndex(name string) error {
-	if name == "" {
-		return ErrInvalidOperation
-	}
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	if db.closed {
 		return ErrDatabaseClosed
+	}
+	if name == "" {
+		return ErrInvalidOperation
 	}
 	if _, ok := db.idxs[name]; !ok {
 		return ErrNotFound
@@ -320,17 +325,24 @@ func (db *DB) Indexes() ([]string, error) {
 	return names, nil
 }
 
-// Config returns the database configuration.
-func (db *DB) Config() Config {
+// ReadConfig returns the database configuration.
+func (db *DB) ReadConfig(config *Config) error {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
-	return db.config
+	if db.closed {
+		return ErrDatabaseClosed
+	}
+	*config = db.config
+	return nil
 }
 
 // SetConfig updates the database configuration.
 func (db *DB) SetConfig(config Config) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
+	if db.closed {
+		return ErrDatabaseClosed
+	}
 	if config.AutoShrink < 0 || config.AutoShrink == 1 {
 		return ErrInvalidAutoShrink
 	}
@@ -426,17 +438,11 @@ func (db *DB) backgroundManager() {
 	t := time.NewTicker(time.Second)
 	defer t.Stop()
 	for range t.C {
-		stop := false
 		multiple := 0
 		autoshink := 0
 		// Open a standard view. This will take a full lock of the
 		// database thus allowing for access to anything we need.
-		db.Update(func(tx *Tx) error {
-			if db.closed {
-				// the manager has stopped. exit now.
-				stop = true
-				return nil
-			}
+		err := db.Update(func(tx *Tx) error {
 			autoshink = db.config.AutoShrink
 			if db.keys.Len() > 0 {
 				multiple = db.aoflen / db.keys.Len()
@@ -468,11 +474,15 @@ func (db *DB) backgroundManager() {
 			}
 			return nil
 		})
-		if stop {
+		if err == ErrDatabaseClosed {
 			break
 		}
 		if multiple >= autoshink && autoshink > 1 {
-			db.Shrink()
+			if err = db.Shrink(); err != nil {
+				if err == ErrDatabaseClosed {
+					break
+				}
+			}
 		}
 	}
 }
@@ -813,16 +823,16 @@ func (db *DB) begin(writable bool) (*Tx, error) {
 		db:       db,
 		writable: writable,
 	}
+	tx.lock()
+	if db.closed {
+		tx.unlock()
+		return nil, ErrDatabaseClosed
+	}
 	if writable {
 		tx.rollbacks = make(map[string]*dbItem)
 		if db.persist {
 			tx.commits = make(map[string]*dbItem)
 		}
-	}
-	tx.lock()
-	if db.closed {
-		tx.unlock()
-		return nil, ErrDatabaseClosed
 	}
 	return tx, nil
 }

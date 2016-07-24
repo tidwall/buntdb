@@ -976,7 +976,10 @@ func TestConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := db.Config()
+	var c Config
+	if err := db.ReadConfig(&c); err != nil {
+		t.Fatal(err)
+	}
 	if c.AutoShrink != 6 || c.SyncPolicy != Always {
 		t.Fatalf("expecting %v and %v, got %v and %v", 6, Always, c.AutoShrink, c.SyncPolicy)
 	}
