@@ -1064,7 +1064,7 @@ func benchOpenFillData(t *testing.B, N int,
 		t.Fatal(err)
 	}
 	if n != uint64(N) {
-		t.Fatal("expecting '%v', got '%v'", N, n)
+		t.Fatalf("expecting '%v', got '%v'", N, n)
 	}
 	t.StartTimer()
 	return db, keys, vals
@@ -1165,12 +1165,12 @@ func benchScan(t *testing.B, asc bool, count int) {
 					count++
 					return true
 				})
-			} else {
-				return tx.Descend("", func(key, val string) bool {
-					count++
-					return true
-				})
 			}
+			return tx.Descend("", func(key, val string) bool {
+				count++
+				return true
+			})
+
 		})
 		if err != nil {
 			t.Fatal(err)
