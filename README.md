@@ -394,7 +394,7 @@ SPATIAL_INTERSECTS_400: 306951.15 operations per second
 SPATIAL_INTERSECTS_800: 159673.91 operations per second
 ```
 
-To install this utility run:
+To install this utility:
 
 ```
 go install github.com/tidwall/buntdb-benchmark
