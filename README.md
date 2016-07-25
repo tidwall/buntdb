@@ -28,7 +28,7 @@ an amazing key/value store that can handle terabytes of data on disk.
 Features
 ========
 
-- In-memory database for [fast reads and writes](https://github.com/tidwall/raft-boltdb#benchmarks)
+- In-memory database for [fast reads and writes](#performance)
 - Embeddable with a [simple API](https://godoc.org/github.com/tidwall/buntdb)
 - [Spatial indexing](#spatial-indexes) for up to 20 dimensions; Useful for Geospatial data
 - Create [custom indexes](#custom-indexes) for any data type
@@ -356,6 +356,50 @@ There's the optional database config setting `Config.SyncPolicy` which can be se
 - `Never` - fsync is managed by the operating system, less safe
 - `EverySecond` - fsync every second, fast and safer, this is the default
 - `Always` - fsync after every write, very durable, very slow
+
+## Performance
+
+How fast is BuntDB?
+
+Here are some example [benchmarks](https://github.com/tidwall/raft-boltdb#benchmarks) when comparing BuntDB to BoltDB using a Raft Store implementation. 
+
+You can also run the standard Go benchmark tool from the project root directory:
+
+```
+go test --bench=.
+```
+
+### BuntDB-Benchmark
+
+There's a [custom utility](https://github.com/tidwall/buntdb-benchmark) that was created specifically for benchmarking BuntDB.
+
+*These are the results from running the benchmarks on a MacBook Pro 15" 2.8 GHz Intel Core i7:*
+
+```
+$ buntdb-benchmark -q
+GET: 4609604.74 operations per second
+SET: 248500.33 operations per second
+ASCEND_100: 2268998.79 operations per second
+ASCEND_200: 1178388.14 operations per second
+ASCEND_400: 679134.20 operations per second
+ASCEND_800: 348445.55 operations per second
+DESCEND_100: 2313821.69 operations per second
+DESCEND_200: 1292738.38 operations per second
+DESCEND_400: 675258.76 operations per second
+DESCEND_800: 337481.67 operations per second
+SPATIAL_SET: 134824.60 operations per second
+SPATIAL_INTERSECTS_100: 939491.47 operations per second
+SPATIAL_INTERSECTS_200: 561590.40 operations per second
+SPATIAL_INTERSECTS_400: 306951.15 operations per second
+SPATIAL_INTERSECTS_800: 159673.91 operations per second
+```
+
+To install this utility run:
+
+```
+go install github.com/tidwall/buntdb-benchmark
+```
+
 
 
 ## Contact
