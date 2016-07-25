@@ -361,7 +361,7 @@ There's the optional database config setting `Config.SyncPolicy` which can be se
 
 How fast is BuntDB?
 
-Here are some example [benchmarks](https://github.com/tidwall/raft-boltdb#benchmarks) when comparing BuntDB to BoltDB using a Raft Store implementation. 
+Here are some example [benchmarks](https://github.com/tidwall/raft-boltdb#benchmarks) when using BuntDB in a Raft Store implementation. 
 
 You can also run the standard Go benchmark tool from the project root directory:
 
