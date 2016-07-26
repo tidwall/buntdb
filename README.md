@@ -6,7 +6,7 @@
 <a href="https://travis-ci.org/tidwall/buntdb"><img src="https://travis-ci.org/tidwall/buntdb.svg?branch=master" alt="Build Status"></a>
 <img src="https://img.shields.io/badge/coverage-96%25-green.svg?style=flat" alt="Code Coverage">
 <a href="https://godoc.org/github.com/tidwall/buntdb"><img src="https://godoc.org/github.com/tidwall/buntdb?status.svg" alt="GoDoc"></a>
-<img src="https://img.shields.io/badge/version-0.1.0-green.svg" alt="Version">
+<!--<img src="https://img.shields.io/badge/version-0.1.0-green.svg" alt="Version">-->
 </p>
 
 ====
@@ -19,7 +19,7 @@ speed over data size.
 
 The desire to create BuntDB stems from the need for a new embeddable
 database for [Tile38](https://github.com/tidwall/tile38). One that can work 
-both as a performant [Raft Store](https://github.com/tidwall/raft-boltdb), 
+both as a performant [Raft Store](https://github.com/tidwall/raft-buntdb), 
 and a Geospatial database.
 
 Much of the API is inspired by the fantastic [BoltDB](https://github.com/boltdb/bolt),
@@ -361,7 +361,7 @@ There's the optional database config setting `Config.SyncPolicy` which can be se
 
 How fast is BuntDB?
 
-Here are some example [benchmarks](https://github.com/tidwall/raft-boltdb#benchmarks) when using BuntDB in a Raft Store implementation. 
+Here are some example [benchmarks](https://github.com/tidwall/raft-buntdb#raftstore-performance-comparison) when using BuntDB in a Raft Store implementation. 
 
 You can also run the standard Go benchmark tool from the project root directory:
 
