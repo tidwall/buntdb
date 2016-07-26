@@ -345,7 +345,7 @@ When the database opens again, it will read back the aof file and process each c
 
 As you may guess this log file can grow large over time. There is a `Shrink()` function which will rewrite the aof file so that it contains only the items in the database. The shrink operation does not lock up the database so read and write transactions can continue while shrinking is in process.
 
-Also there's the database config setting `Config.AutoShrink` which is used to allow for shrinking to be self-managed. This value is set to a multiple that represents how many more entries in the aof file versus the number of items in memory. For example; If this value is set to 10 and the number of item in memory is 150,000, then the database will automatically shrink when the aof file has 1,500,000 lines in it. Currently default value is 5, but this may change in a future release. Autoshink can be disabled by setting this value to zero.
+Also there's the database config setting `Config.AutoShrink` which is used to allow for shrinking to be self-managed. This value is set to a multiple that represents how many more entries in the aof file versus the number of items in memory. For example; If this value is set to 10 and the number of item in memory is 150,000, then the database will automatically shrink when the aof file has 1,500,000 lines in it. Currently default value is 50, but this may change in a future release. Autoshink can be disabled by setting this value to zero.
 
 ### Durability and fsync
 
