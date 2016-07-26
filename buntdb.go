@@ -50,6 +50,9 @@ var (
 
 	// ErrInvalidSyncPolicy is returned for an invalid SyncPolicy value.
 	ErrInvalidSyncPolicy = errors.New("invalid sync policy")
+
+	// ErrShrinkInProcess is returned when a shrink operation is in-process.
+	ErrShrinkInProcess = errors.New("shrink is in-process")
 )
 
 // Iterator allows callers of Ascend* or Descend* to iterate in-order
@@ -61,18 +64,19 @@ type Iterator func(key, val string) bool
 // DB represents a collection of key-value pairs that persist on disk.
 // Transactions are used for all forms of data access to the DB.
 type DB struct {
-	mu      sync.RWMutex      // the gatekeeper for all fields
-	file    *os.File          // the underlying file
-	bufw    *bufio.Writer     // only write to this
-	keys    *btree.BTree      // a tree of all item ordered by key
-	exps    *btree.BTree      // a tree of items ordered by expiration
-	idxs    map[string]*index // the index trees.
-	exmgr   bool              // indicates that expires manager is running.
-	flushes int               // a count of the number of disk flushes
-	closed  bool              // set when the database has been closed
-	aoflen  int               // the number of lines in the aof file
-	config  Config            // the database configuration
-	persist bool              // do we write to disk
+	mu        sync.RWMutex      // the gatekeeper for all fields
+	file      *os.File          // the underlying file
+	bufw      *bufio.Writer     // only write to this
+	keys      *btree.BTree      // a tree of all item ordered by key
+	exps      *btree.BTree      // a tree of items ordered by expiration
+	idxs      map[string]*index // the index trees.
+	exmgr     bool              // indicates that expires manager is running.
+	flushes   int               // a count of the number of disk flushes
+	closed    bool              // set when the database has been closed
+	aoflen    int               // the number of lines in the aof file
+	config    Config            // the database configuration
+	persist   bool              // do we write to disk
+	shrinking bool              // when an aof shrink is in-process.
 }
 
 // SyncPolicy represents how often data is synced to disk.
@@ -107,9 +111,11 @@ type Config struct {
 	// disk may be up to 2x the number of items on disk.
 	// A zero value will disable auto shrinking.
 	// A negative value or 1 are invalid.
-	// The default is value is 5.
+	// The default is value is 50, but may change in the future.
 	AutoShrink int
 }
+
+const defaultAutoShrinkMultiplier = 50
 
 // exctx is a simple b-tree context for ordering by expiration.
 type exctx struct {
@@ -125,7 +131,7 @@ func Open(path string) (*DB, error) {
 	db.idxs = make(map[string]*index)
 	db.config = Config{
 		SyncPolicy: EverySecond,
-		AutoShrink: 5,
+		AutoShrink: defaultAutoShrinkMultiplier,
 	}
 	db.persist = path != ":memory:"
 	if db.persist {
@@ -501,6 +507,17 @@ func (db *DB) Shrink() error {
 		db.mu.Unlock()
 		return nil
 	}
+	if db.shrinking {
+		// The database is already in the process of shrinking.
+		db.mu.Unlock()
+		return ErrShrinkInProcess
+	}
+	db.shrinking = true
+	defer func() {
+		db.mu.Lock()
+		db.shrinking = false
+		db.mu.Unlock()
+	}()
 	fname := db.file.Name()
 	tmpname := fname + ".tmp"
 	// the endpos is used to return to the end of the file when we are
