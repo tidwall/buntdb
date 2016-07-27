@@ -349,13 +349,13 @@ Also there's the database config setting `Config.AutoShrink` which is used to al
 
 ### Durability and fsync
 
-BuntDB executes an `fsync` once every second on the [aof file](#append-only-file). Which simply means that there's a chance that up to 1 second of data might be lost. The likelihood of this happening is dependent on a lot of factors, but suffice to say this may not be good enough for environments that require very high durability. 
+By default BuntDB executes an `fsync` once every second on the [aof file](#append-only-file). Which simply means that there's a chance that up to one second of data might be lost. If you need higher durability then there's an optional database config setting `Config.SyncPolicy` which can be set to `Always`.
 
-There's the optional database config setting `Config.SyncPolicy` which can be set to 
+The `Config.SyncPolicy` has the following options:
 
 - `Never` - fsync is managed by the operating system, less safe
 - `EverySecond` - fsync every second, fast and safer, this is the default
-- `Always` - fsync after every write, very durable, very slow
+- `Always` - fsync after every write, very durable, slower
 
 ## Performance
 
