@@ -15,75 +15,94 @@ import (
 )
 
 func TestBackgroudOperations(t *testing.T) {
-	os.RemoveAll("data.db")
+	if err := os.RemoveAll("data.db"); err != nil {
+		t.Fatal(err)
+	}
 	db, err := Open("data.db")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll("data.db")
-	defer db.Close()
+	defer func() { _ = os.RemoveAll("data.db") }()
+	defer func() { _ = db.Close() }()
 	for i := 0; i < 1000; i++ {
 		if err := db.Update(func(tx *Tx) error {
 			for j := 0; j < 200; j++ {
-				tx.Set(fmt.Sprintf("hello%d", j), "planet", nil)
+				if _, _, err := tx.Set(fmt.Sprintf("hello%d", j), "planet", nil); err != nil {
+					return err
+				}
 			}
-			tx.Set("hi", "world", &SetOptions{Expires: true, TTL: time.Second / 2})
+			if _, _, err := tx.Set("hi", "world", &SetOptions{Expires: true, TTL: time.Second / 2}); err != nil {
+				return err
+			}
 			return nil
 		}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	n := 0
-	db.View(func(tx *Tx) error {
-		n, _ = tx.Len()
-		return nil
+	err = db.View(func(tx *Tx) error {
+		var err error
+		n, err = tx.Len()
+		return err
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if n != 201 {
 		t.Fatalf("expecting '%v', got '%v'", 201, n)
 	}
 	time.Sleep(time.Millisecond * 1500)
-	db.Close()
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
 	db, err = Open("data.db")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll("data.db")
-	defer db.Close()
+	defer func() { _ = os.RemoveAll("data.db") }()
+	defer func() { _ = db.Close() }()
 	n = 0
-	db.View(func(tx *Tx) error {
-		n, _ = tx.Len()
-		return nil
+	err = db.View(func(tx *Tx) error {
+		var err error
+		n, err = tx.Len()
+		return err
 	})
 	if n != 200 {
 		t.Fatalf("expecting '%v', got '%v'", 200, n)
 	}
 }
 func TestVariousTx(t *testing.T) {
-	os.RemoveAll("data.db")
+	if err := os.RemoveAll("data.db"); err != nil {
+		t.Fatal(err)
+	}
 	db, err := Open("data.db")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll("data.db")
-	defer db.Close()
+	defer func() { _ = os.RemoveAll("data.db") }()
+	defer func() { _ = db.Close() }()
 	if err := db.Update(func(tx *Tx) error {
-		tx.Set("hello", "planet", nil)
-		return nil
+		_, _, err := tx.Set("hello", "planet", nil)
+		return err
 	}); err != nil {
 		t.Fatal(err)
 	}
 	errBroken := errors.New("broken")
 	if err := db.Update(func(tx *Tx) error {
-		tx.Set("hello", "world", nil)
+		_, _, _ = tx.Set("hello", "world", nil)
 		return errBroken
 	}); err != errBroken {
 		t.Fatalf("did not correctly receive the user-defined transaction error.")
 	}
 	var val string
-	db.View(func(tx *Tx) error {
-		val, _ = tx.Get("hello")
-		return nil
+	err = db.View(func(tx *Tx) error {
+		var err error
+		val, err = tx.Get("hello")
+		return err
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if val == "world" {
 		t.Fatal("a rollbacked transaction got through")
 	}
@@ -116,7 +135,9 @@ func TestVariousTx(t *testing.T) {
 		if _, err := tx.Delete("something"); err != ErrNotFound {
 			t.Fatalf("expecting not found error")
 		}
-		tx.Set("var", "val", &SetOptions{Expires: true, TTL: 0})
+		if _, _, err := tx.Set("var", "val", &SetOptions{Expires: true, TTL: 0}); err != nil {
+			t.Fatal(err)
+		}
 		if _, err := tx.Get("var"); err != ErrNotFound {
 			t.Fatalf("expecting not found error")
 		}
@@ -139,8 +160,7 @@ func TestVariousTx(t *testing.T) {
 				}
 			}
 		}()
-		tx.commit()
-		return nil
+		return tx.commit()
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -155,8 +175,7 @@ func TestVariousTx(t *testing.T) {
 				}
 			}
 		}()
-		tx.rollback()
-		return nil
+		return tx.rollback()
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -188,9 +207,11 @@ func TestVariousTx(t *testing.T) {
 	db.mu.RUnlock()
 	// flush to unwritable file
 	if err := db.Update(func(tx *Tx) error {
-		tx.Set("var1", "val1", nil)
-		tx.db.file.Close()
-		return nil
+		_, _, err := tx.Set("var1", "val1", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return tx.db.file.Close()
 	}); err == nil {
 		t.Fatal("should not be able to commit when the file is closed")
 	}
@@ -202,20 +223,25 @@ func TestVariousTx(t *testing.T) {
 		t.Fatal(err)
 	}
 	db.bufw = bufio.NewWriter(db.file)
-	db.CreateIndex("blank", "*", nil)
+	if err := db.CreateIndex("blank", "*", nil); err != nil {
+		t.Fatal(err)
+	}
 	// test scanning
 	if err := db.Update(func(tx *Tx) error {
-		tx.Set("nothing", "here", nil)
-		return nil
+		_, _, err := tx.Set("nothing", "here", nil)
+		return err
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.View(func(tx *Tx) error {
 		s := ""
-		tx.Ascend("", func(key, val string) bool {
+		err := tx.Ascend("", func(key, val string) bool {
 			s += key + ":" + val + "\n"
 			return true
 		})
+		if err != nil {
+			return err
+		}
 		if s != "hello:planet\nnothing:here\n" {
 			t.Fatal("invalid scan")
 		}
@@ -235,45 +261,62 @@ func TestVariousTx(t *testing.T) {
 			t.Fatal(err)
 		}
 		s = ""
-		tx.AscendLessThan("", "liger", func(key, val string) bool {
+		err = tx.AscendLessThan("", "liger", func(key, val string) bool {
 			s += key + ":" + val + "\n"
 			return true
 		})
+		if err != nil {
+			return err
+		}
 		if s != "hello:planet\n" {
 			t.Fatal("invalid scan")
 		}
 
 		s = ""
-		tx.Descend("", func(key, val string) bool {
+		err = tx.Descend("", func(key, val string) bool {
 			s += key + ":" + val + "\n"
 			return true
 		})
+		if err != nil {
+			return err
+		}
 		if s != "nothing:here\nhello:planet\n" {
 			t.Fatal("invalid scan")
 		}
 
 		s = ""
-		tx.DescendLessOrEqual("", "liger", func(key, val string) bool {
+		err = tx.DescendLessOrEqual("", "liger", func(key, val string) bool {
 			s += key + ":" + val + "\n"
 			return true
 		})
+		if err != nil {
+			return err
+		}
+
 		if s != "hello:planet\n" {
 			t.Fatal("invalid scan")
 		}
 
 		s = ""
-		tx.DescendGreaterThan("", "liger", func(key, val string) bool {
+		err = tx.DescendGreaterThan("", "liger", func(key, val string) bool {
 			s += key + ":" + val + "\n"
 			return true
 		})
+		if err != nil {
+			return err
+		}
+
 		if s != "nothing:here\n" {
 			t.Fatal("invalid scan")
 		}
 		s = ""
-		tx.DescendRange("", "liger", "apple", func(key, val string) bool {
+		err = tx.DescendRange("", "liger", "apple", func(key, val string) bool {
 			s += key + ":" + val + "\n"
 			return true
 		})
+		if err != nil {
+			return err
+		}
 		if s != "hello:planet\n" {
 			t.Fatal("invalid scan")
 		}
@@ -283,22 +326,35 @@ func TestVariousTx(t *testing.T) {
 	}
 
 	// test some spatial stuff
-	db.CreateSpatialIndex("spat", "rect:*", IndexRect)
-	db.CreateSpatialIndex("junk", "rect:*", nil)
-	db.Update(func(tx *Tx) error {
-		tx.Set("rect:1", "[10 10],[20 20]", nil)
-		tx.Set("rect:2", "[15 15],[25 25]", nil)
-		tx.Set("shape:1", "[12 12],[25 25]", nil)
+	if err := db.CreateSpatialIndex("spat", "rect:*", IndexRect); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.CreateSpatialIndex("junk", "rect:*", nil); err != nil {
+		t.Fatal(err)
+	}
+	err = db.Update(func(tx *Tx) error {
+		if _, _, err := tx.Set("rect:1", "[10 10],[20 20]", nil); err != nil {
+			return err
+		}
+		if _, _, err := tx.Set("rect:2", "[15 15],[25 25]", nil); err != nil {
+			return err
+		}
+		if _, _, err := tx.Set("shape:1", "[12 12],[25 25]", nil); err != nil {
+			return err
+		}
 		s := ""
-		tx.Intersects("spat", "[5 5],[13 13]", func(key, val string) bool {
+		err := tx.Intersects("spat", "[5 5],[13 13]", func(key, val string) bool {
 			s += key + ":" + val + "\n"
 			return true
 		})
+		if err != nil {
+			return err
+		}
 		if s != "rect:1:[10 10],[20 20]\n" {
 			t.Fatal("invalid scan")
 		}
 		tx.db = nil
-		err := tx.Intersects("spat", "[5 5],[13 13]", func(key, val string) bool {
+		err = tx.Intersects("spat", "[5 5],[13 13]", func(key, val string) bool {
 			return true
 		})
 		if err != ErrTxClosed {
@@ -338,9 +394,14 @@ func TestVariousTx(t *testing.T) {
 		tx.db = db
 		return nil
 	})
-
+	if err != nil {
+		t.Fatal(err)
+	}
 	// test after closing
-	db.Close()
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
 	if err := db.Update(func(tx *Tx) error { return nil }); err != ErrDatabaseClosed {
 		t.Fatalf("should not be able to perform transactionso on a closed database.")
 	}
@@ -354,6 +415,72 @@ func TestNoExpiringItem(t *testing.T) {
 		t.Fatal("item min,max should both be nil")
 	}
 }
+func TestAutoShrink(t *testing.T) {
+	if err := os.RemoveAll("data.db"); err != nil {
+		t.Fatal(err)
+	}
+	db, err := Open("data.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.RemoveAll("data.db") }()
+	defer func() { _ = db.Close() }()
+	for i := 0; i < 1000; i++ {
+		err = db.Update(func(tx *Tx) error {
+			for i := 0; i < 20; i++ {
+				if _, _, err := tx.Set(fmt.Sprintf("HELLO:%d", i), "WORLD", nil); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	db, err = Open("data.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.config.AutoShrinkMinSize = 64 * 1024 // 64K
+	for i := 0; i < 2000; i++ {
+		err = db.Update(func(tx *Tx) error {
+			for i := 0; i < 20; i++ {
+				if _, _, err := tx.Set(fmt.Sprintf("HELLO:%d", i), "WORLD", nil); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	time.Sleep(time.Second * 3)
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	db, err = Open("data.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.View(func(tx *Tx) error {
+		n, err := tx.Len()
+		if err != nil {
+			return err
+		}
+		if n != 20 {
+			t.Fatalf("expecting 20, got %v", n)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
 
 // test database format loading
 func TestDatabaseFormat(t *testing.T) {
@@ -365,22 +492,34 @@ func TestDatabaseFormat(t *testing.T) {
 			"*2\r\n$3\r\ndel\r\n$4\r\nvar1\r\n",
 			"*5\r\n$3\r\nset\r\n$3\r\nvar\r\n$3\r\nval\r\n$2\r\nex\r\n$2\r\n10\r\n",
 		}, "")
-		os.RemoveAll("data.db")
-		ioutil.WriteFile("data.db", []byte(resp), 0666)
+		if err := os.RemoveAll("data.db"); err != nil {
+			t.Fatal(err)
+		}
+		if err := ioutil.WriteFile("data.db", []byte(resp), 0666); err != nil {
+			t.Fatal(err)
+		}
 		db, err := Open("data.db")
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer os.RemoveAll("data.db")
-		defer db.Close()
+		defer func() { _ = os.RemoveAll("data.db") }()
+		defer func() { _ = db.Close() }()
 	}()
 	testBadFormat := func(resp string) {
-		os.RemoveAll("data.db")
-		ioutil.WriteFile("data.db", []byte(resp), 0666)
+		if err := os.RemoveAll("data.db"); err != nil {
+			t.Fatal(err)
+		}
+		if err := ioutil.WriteFile("data.db", []byte(resp), 0666); err != nil {
+			t.Fatal(err)
+		}
 		db, err := Open("data.db")
 		if err == nil {
-			db.Close()
-			os.RemoveAll("data.db")
+			if err := db.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.RemoveAll("data.db"); err != nil {
+				t.Fatal(err)
+			}
 			t.Fatalf("invalid database should not be allowed")
 		}
 	}
@@ -402,19 +541,31 @@ func TestDatabaseFormat(t *testing.T) {
 }
 
 func TestInsertsAndDeleted(t *testing.T) {
-	os.RemoveAll("data.db")
+	if err := os.RemoveAll("data.db"); err != nil {
+		t.Fatal(err)
+	}
 	db, err := Open("data.db")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll("data.db")
-	defer db.Close()
-	db.CreateIndex("any", "*", IndexString)
-	db.CreateSpatialIndex("rect", "*", IndexRect)
+	defer func() { _ = os.RemoveAll("data.db") }()
+	defer func() { _ = db.Close() }()
+	if err := db.CreateIndex("any", "*", IndexString); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.CreateSpatialIndex("rect", "*", IndexRect); err != nil {
+		t.Fatal(err)
+	}
 	if err := db.Update(func(tx *Tx) error {
-		tx.Set("item1", "value1", &SetOptions{Expires: true, TTL: time.Second})
-		tx.Set("item2", "value2", nil)
-		tx.Set("item3", "value3", &SetOptions{Expires: true, TTL: time.Second})
+		if _, _, err := tx.Set("item1", "value1", &SetOptions{Expires: true, TTL: time.Second}); err != nil {
+			return err
+		}
+		if _, _, err := tx.Set("item2", "value2", nil); err != nil {
+			return err
+		}
+		if _, _, err := tx.Set("item3", "value3", &SetOptions{Expires: true, TTL: time.Second}); err != nil {
+			return err
+		}
 		return nil
 	}); err != nil {
 		t.Fatal(err)
@@ -482,36 +633,50 @@ func TestIndexCompare(t *testing.T) {
 
 // test opening a folder.
 func TestOpeningAFolder(t *testing.T) {
-	os.RemoveAll("dir.tmp")
-	os.Mkdir("dir.tmp", 0700)
-	defer os.RemoveAll("dir.tmp")
+	if err := os.RemoveAll("dir.tmp"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir("dir.tmp", 0700); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.RemoveAll("dir.tmp") }()
 	db, err := Open("dir.tmp")
 	if err == nil {
-		db.Close()
+		if err := db.Close(); err != nil {
+			t.Fatal(err)
+		}
 		t.Fatalf("opening a directory should not be allowed")
 	}
 }
 
 // test opening an invalid resp file.
 func TestOpeningInvalidDatabaseFile(t *testing.T) {
-	os.RemoveAll("data.db")
-	ioutil.WriteFile("data.db", []byte("invalid\r\nfile"), 0666)
-	defer os.RemoveAll("data.db")
+	if err := os.RemoveAll("data.db"); err != nil {
+		t.Fatal(err)
+	}
+	if err := ioutil.WriteFile("data.db", []byte("invalid\r\nfile"), 0666); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.RemoveAll("data.db") }()
 	db, err := Open("data.db")
 	if err == nil {
-		db.Close()
+		if err := db.Close(); err != nil {
+			t.Fatal(err)
+		}
 		t.Fatalf("invalid database should not be allowed")
 	}
 }
 
 // test closing a closed database.
 func TestOpeningClosedDatabase(t *testing.T) {
-	os.RemoveAll("data.db")
+	if err := os.RemoveAll("data.db"); err != nil {
+		t.Fatal(err)
+	}
 	db, err := Open("data.db")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll("data.db")
+	defer func() { _ = os.RemoveAll("data.db") }()
 	if err := db.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -532,13 +697,15 @@ func TestOpeningClosedDatabase(t *testing.T) {
 
 // test shrinking a database.
 func TestShrink(t *testing.T) {
-	os.RemoveAll("data.db")
+	if err := os.RemoveAll("data.db"); err != nil {
+		t.Fatal(err)
+	}
 	db, err := Open("data.db")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll("data.db")
-	defer db.Close()
+	defer func() { _ = os.RemoveAll("data.db") }()
+	defer func() { _ = db.Close() }()
 	if err := db.Shrink(); err != nil {
 		t.Fatal(err)
 	}
@@ -550,20 +717,30 @@ func TestShrink(t *testing.T) {
 		t.Fatalf("expected %v, got %v", 0, fi.Size())
 	}
 	// add 10 items
-	db.Update(func(tx *Tx) error {
+	err = db.Update(func(tx *Tx) error {
 		for i := 0; i < 10; i++ {
-			tx.Set(fmt.Sprintf("key%d", i), fmt.Sprintf("val%d", i), nil)
+			if _, _, err := tx.Set(fmt.Sprintf("key%d", i), fmt.Sprintf("val%d", i), nil); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	// add the same 10 items
 	// this will create 10 duplicate log entries
-	db.Update(func(tx *Tx) error {
+	err = db.Update(func(tx *Tx) error {
 		for i := 0; i < 10; i++ {
-			tx.Set(fmt.Sprintf("key%d", i), fmt.Sprintf("val%d", i), nil)
+			if _, _, err := tx.Set(fmt.Sprintf("key%d", i), fmt.Sprintf("val%d", i), nil); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	fi, err = os.Stat("data.db")
 	if err != nil {
 		t.Fatal(err)
@@ -583,7 +760,9 @@ func TestShrink(t *testing.T) {
 	if sz2 >= sz1 {
 		t.Fatalf("expected < %v, got %v", sz1, sz2)
 	}
-	db.Close()
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
 	if err := db.Shrink(); err != ErrDatabaseClosed {
 		t.Fatal("shrink on a closed databse should not be allowed")
 	}
@@ -592,24 +771,33 @@ func TestShrink(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	// add 10 items
-	db.Update(func(tx *Tx) error {
+	err = db.Update(func(tx *Tx) error {
 		for i := 0; i < 10; i++ {
-			tx.Set(fmt.Sprintf("key%d", i), fmt.Sprintf("val%d", i), nil)
+			if _, _, err := tx.Set(fmt.Sprintf("key%d", i), fmt.Sprintf("val%d", i), nil); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	// add the same 10 items
 	// this will create 10 duplicate log entries
-	db.Update(func(tx *Tx) error {
+	err = db.Update(func(tx *Tx) error {
 		for i := 0; i < 10; i++ {
-			tx.Set(fmt.Sprintf("key%d", i), fmt.Sprintf("val%d", i), nil)
+			if _, _, err := tx.Set(fmt.Sprintf("key%d", i), fmt.Sprintf("val%d", i), nil); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
-
-	db.View(func(tx *Tx) error {
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.View(func(tx *Tx) error {
 		n, err := tx.Len()
 		if err != nil {
 			t.Fatal(err)
@@ -619,6 +807,9 @@ func TestShrink(t *testing.T) {
 		}
 		return nil
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	// this should succeed even though it's basically a noop.
 	if err := db.Shrink(); err != nil {
 		t.Fatal(err)
@@ -626,13 +817,15 @@ func TestShrink(t *testing.T) {
 }
 
 func TestVariousIndexOperations(t *testing.T) {
-	os.RemoveAll("data.db")
+	if err := os.RemoveAll("data.db"); err != nil {
+		t.Fatal(err)
+	}
 	db, err := Open("data.db")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll("data.db")
-	defer db.Close()
+	defer func() { _ = os.RemoveAll("data.db") }()
+	defer func() { _ = db.Close() }()
 	// test creating an index with no index name.
 	err = db.CreateIndex("", "", nil)
 	if err == nil {
@@ -647,15 +840,31 @@ func TestVariousIndexOperations(t *testing.T) {
 	if err == nil {
 		t.Fatal("should not be able to create a duplicate index")
 	}
-	db.Update(func(tx *Tx) error {
-		tx.Set("user:1", "tom", nil)
-		tx.Set("user:2", "janet", nil)
-		tx.Set("alt:1", "from", nil)
-		tx.Set("alt:2", "there", nil)
-		tx.Set("rect:1", "[1 2],[3 4]", nil)
-		tx.Set("rect:2", "[5 6],[7 8]", nil)
+	err = db.Update(func(tx *Tx) error {
+
+		if _, _, err := tx.Set("user:1", "tom", nil); err != nil {
+			return err
+		}
+		if _, _, err := tx.Set("user:2", "janet", nil); err != nil {
+			return err
+		}
+		if _, _, err := tx.Set("alt:1", "from", nil); err != nil {
+			return err
+		}
+		if _, _, err := tx.Set("alt:2", "there", nil); err != nil {
+			return err
+		}
+		if _, _, err := tx.Set("rect:1", "[1 2],[3 4]", nil); err != nil {
+			return err
+		}
+		if _, _, err := tx.Set("rect:2", "[5 6],[7 8]", nil); err != nil {
+			return err
+		}
 		return nil
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	// test creating an index after adding items. use pattern matching. have some items in the match and some not.
 	if err := db.CreateIndex("string", "user:*", IndexString); err != nil {
 		t.Fatal(err)
@@ -727,35 +936,60 @@ func TestPatternMatching(t *testing.T) {
 
 func TestBasic(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
-	os.RemoveAll("data.db")
+	if err := os.RemoveAll("data.db"); err != nil {
+		t.Fatal(err)
+	}
 	db, err := Open("data.db")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll("data.db")
-	defer db.Close()
+	defer func() { _ = os.RemoveAll("data.db") }()
+	defer func() { _ = db.Close() }()
 
 	// create a simple index
-	db.CreateIndex("users", "fun:user:*", IndexString)
+	if err := db.CreateIndex("users", "fun:user:*", IndexString); err != nil {
+		t.Fatal(err)
+	}
 
 	// create a spatial index
-	db.CreateSpatialIndex("rects", "rect:*", IndexRect)
+	if err := db.CreateSpatialIndex("rects", "rect:*", IndexRect); err != nil {
+		t.Fatal(err)
+	}
 	if true {
-		db.Update(func(tx *Tx) error {
-			tx.Set("fun:user:0", "tom", nil)
-			tx.Set("fun:user:1", "Randi", nil)
-			tx.Set("fun:user:2", "jane", nil)
-			tx.Set("fun:user:4", "Janet", nil)
-			tx.Set("fun:user:5", "Paula", nil)
-			tx.Set("fun:user:6", "peter", nil)
-			tx.Set("fun:user:7", "Terri", nil)
+		err := db.Update(func(tx *Tx) error {
+			if _, _, err := tx.Set("fun:user:0", "tom", nil); err != nil {
+				return err
+			}
+			if _, _, err := tx.Set("fun:user:1", "Randi", nil); err != nil {
+				return err
+			}
+			if _, _, err := tx.Set("fun:user:2", "jane", nil); err != nil {
+				return err
+			}
+			if _, _, err := tx.Set("fun:user:4", "Janet", nil); err != nil {
+				return err
+			}
+			if _, _, err := tx.Set("fun:user:5", "Paula", nil); err != nil {
+				return err
+			}
+			if _, _, err := tx.Set("fun:user:6", "peter", nil); err != nil {
+				return err
+			}
+			if _, _, err := tx.Set("fun:user:7", "Terri", nil); err != nil {
+				return err
+			}
 			return nil
 		})
+		if err != nil {
+			t.Fatal(err)
+		}
 		// add some random items
 		start := time.Now()
 		if err := db.Update(func(tx *Tx) error {
 			for _, i := range rand.Perm(100) {
-				tx.Set(fmt.Sprintf("tag:%d", i+100), fmt.Sprintf("val:%d", rand.Int()%100+100), nil)
+				if _, _, err := tx.Set(fmt.Sprintf("tag:%d", i+100), fmt.Sprintf("val:%d", rand.Int()%100+100), nil); err != nil {
+					return err
+				}
 			}
 			return nil
 		}); err != nil {
@@ -766,9 +1000,15 @@ func TestBasic(t *testing.T) {
 		}
 		// add some random rects
 		if err := db.Update(func(tx *Tx) error {
-			tx.Set("rect:1", Rect([]float64{10, 10}, []float64{20, 20}), nil)
-			tx.Set("rect:2", Rect([]float64{15, 15}, []float64{24, 24}), nil)
-			tx.Set("rect:3", Rect([]float64{17, 17}, []float64{27, 27}), nil)
+			if _, _, err := tx.Set("rect:1", Rect([]float64{10, 10}, []float64{20, 20}), nil); err != nil {
+				return err
+			}
+			if _, _, err := tx.Set("rect:2", Rect([]float64{15, 15}, []float64{24, 24}), nil); err != nil {
+				return err
+			}
+			if _, _, err := tx.Set("rect:3", Rect([]float64{17, 17}, []float64{27, 27}), nil); err != nil {
+				return err
+			}
 			return nil
 		}); err != nil {
 			t.Fatal(err)
@@ -776,11 +1016,14 @@ func TestBasic(t *testing.T) {
 	}
 	// verify the data has been created
 	buf := &bytes.Buffer{}
-	db.View(func(tx *Tx) error {
-		tx.Ascend("users", func(key, val string) bool {
+	err = db.View(func(tx *Tx) error {
+		err = tx.Ascend("users", func(key, val string) bool {
 			fmt.Fprintf(buf, "%s %s\n", key, val)
 			return true
 		})
+		if err != nil {
+			t.Fatal(err)
+		}
 		err = tx.AscendRange("", "tag:170", "tag:172", func(key, val string) bool {
 			fmt.Fprintf(buf, "%s\n", key)
 			return true
@@ -805,7 +1048,7 @@ func TestBasic(t *testing.T) {
 		})
 		expect := make([]string, 2)
 		n := 0
-		tx.Intersects("rects", "[0 0],[15 15]", func(key, val string) bool {
+		err = tx.Intersects("rects", "[0 0],[15 15]", func(key, val string) bool {
 			if n == 2 {
 				t.Fatalf("too many rects where received, expecting only two")
 			}
@@ -819,11 +1062,19 @@ func TestBasic(t *testing.T) {
 			n++
 			return true
 		})
+		if err != nil {
+			t.Fatal(err)
+		}
 		for _, s := range expect {
-			buf.WriteString(s)
+			if _, err := buf.WriteString(s); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	res := `
 fun:user:2 jane
 fun:user:4 Janet
@@ -897,19 +1148,28 @@ func TestRectStrings(t *testing.T) {
 }
 
 func TestTTL(t *testing.T) {
-	os.RemoveAll("data.db")
+	if err := os.RemoveAll("data.db"); err != nil {
+		t.Fatal(err)
+	}
 	db, err := Open("data.db")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll("data.db")
-	defer db.Close()
-	db.Update(func(tx *Tx) error {
-		tx.Set("key1", "val1", &SetOptions{Expires: true, TTL: time.Second})
-		tx.Set("key2", "val2", nil)
+	defer func() { _ = os.RemoveAll("data.db") }()
+	defer func() { _ = db.Close() }()
+	err = db.Update(func(tx *Tx) error {
+		if _, _, err := tx.Set("key1", "val1", &SetOptions{Expires: true, TTL: time.Second}); err != nil {
+			return err
+		}
+		if _, _, err := tx.Set("key2", "val2", nil); err != nil {
+			return err
+		}
 		return nil
 	})
-	db.View(func(tx *Tx) error {
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.View(func(tx *Tx) error {
 		dur1, err := tx.TTL("key1")
 		if err != nil {
 			t.Fatal(err)
@@ -926,35 +1186,22 @@ func TestTTL(t *testing.T) {
 		}
 		return nil
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestConfig(t *testing.T) {
-	os.RemoveAll("data.db")
+	if err := os.RemoveAll("data.db"); err != nil {
+		t.Fatal(err)
+	}
 	db, err := Open("data.db")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll("data.db")
-	defer db.Close()
+	defer func() { _ = os.RemoveAll("data.db") }()
+	defer func() { _ = db.Close() }()
 
-	err = db.SetConfig(Config{AutoShrink: -1})
-	if err == nil {
-		t.Fatal("expecting a config autoshrink error")
-	}
-	err = db.SetConfig(Config{AutoShrink: 1})
-	if err == nil {
-		t.Fatal("expecting a config autoshrink error")
-	}
-	err = db.SetConfig(Config{AutoShrink: 0})
-	if err != nil {
-		t.Fatal(err)
-	}
-	for i := 2; i < 50; i++ {
-		err = db.SetConfig(Config{AutoShrink: i})
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
 	err = db.SetConfig(Config{SyncPolicy: SyncPolicy(-1)})
 	if err == nil {
 		t.Fatal("expecting a config syncpolicy error")
@@ -971,7 +1218,7 @@ func TestConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = db.SetConfig(Config{AutoShrink: 6, SyncPolicy: Always})
+	err = db.SetConfig(Config{AutoShrinkMinSize: 100, AutoShrinkPercentage: 200, SyncPolicy: Always})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -980,8 +1227,8 @@ func TestConfig(t *testing.T) {
 	if err := db.ReadConfig(&c); err != nil {
 		t.Fatal(err)
 	}
-	if c.AutoShrink != 6 || c.SyncPolicy != Always {
-		t.Fatalf("expecting %v and %v, got %v and %v", 6, Always, c.AutoShrink, c.SyncPolicy)
+	if c.AutoShrinkMinSize != 100 || c.AutoShrinkPercentage != 200 && c.SyncPolicy != Always {
+		t.Fatalf("expecting %v, %v, and %v, got %v, %v, and %v", 100, 200, Always, c.AutoShrinkMinSize, c.AutoShrinkPercentage, c.SyncPolicy)
 	}
 }
 func testUint64Hex(n uint64) string {
@@ -995,9 +1242,13 @@ func textHexUint64(s string) uint64 {
 }
 func benchClose(t *testing.B, persist bool, db *DB) {
 	if persist {
-		os.RemoveAll("data.db")
+		if err := os.RemoveAll("data.db"); err != nil {
+			t.Fatal(err)
+		}
 	}
-	db.Close()
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func benchOpenFillData(t *testing.B, N int,
@@ -1009,7 +1260,9 @@ func benchOpenFillData(t *testing.B, N int,
 	rand.Seed(time.Now().UnixNano())
 	var err error
 	if persist {
-		os.RemoveAll("data.db")
+		if err := os.RemoveAll("data.db"); err != nil {
+			t.Fatal(err)
+		}
 		db, err = Open("data.db")
 	} else {
 		db, err = Open(":memory:")

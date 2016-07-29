@@ -45,9 +45,6 @@ var (
 	// ErrInvalidOperation is returned when an operation cannot be completed.
 	ErrInvalidOperation = errors.New("invalid operation")
 
-	// ErrInvalidAutoShrink is returned for an invalid AutoShrink value.
-	ErrInvalidAutoShrink = errors.New("invalid autoshink")
-
 	// ErrInvalidSyncPolicy is returned for an invalid SyncPolicy value.
 	ErrInvalidSyncPolicy = errors.New("invalid sync policy")
 
@@ -73,10 +70,10 @@ type DB struct {
 	exmgr     bool              // indicates that expires manager is running.
 	flushes   int               // a count of the number of disk flushes
 	closed    bool              // set when the database has been closed
-	aoflen    int               // the number of lines in the aof file
 	config    Config            // the database configuration
 	persist   bool              // do we write to disk
 	shrinking bool              // when an aof shrink is in-process.
+	lastaofsz int               // the size of the last shrink aof size
 }
 
 // SyncPolicy represents how often data is synced to disk.
@@ -103,19 +100,19 @@ type Config struct {
 	// This value can be Never, EverySecond, or Always.
 	// The default is EverySecond.
 	SyncPolicy SyncPolicy
-	// AutoShrink will automatically resize the database file on disk
-	// when it gets too large. The value represents a multiple of
-	// the maximum number of entries that can exist on disk before
-	// an automatic resize occurs.
-	// For example, a value of 2 means that the number of entries on
-	// disk may be up to 2x the number of items on disk.
-	// A zero value will disable auto shrinking.
-	// A negative value or 1 are invalid.
-	// The default is value is 50, but may change in the future.
-	AutoShrink int
-}
 
-const defaultAutoShrinkMultiplier = 50
+	// AutoShrinkPercentage is used by the background process to trigger
+	// a shrink of the aof file when the size of the file is larger than the
+	// percentage of the result of the previous shrunk file.
+	// For example, if this value is 100, and the last shrink process
+	// resulted in a 100mb file, then the new aof file must be 200mb before
+	// a shrink is triggered.
+	AutoShrinkPercentage int
+
+	// AutoShrinkMinSize defines the minimum size of the aof file before
+	// an automatic shrink can occur.
+	AutoShrinkMinSize int
+}
 
 // exctx is a simple b-tree context for ordering by expiration.
 type exctx struct {
@@ -130,8 +127,9 @@ func Open(path string) (*DB, error) {
 	db.exps = btree.New(16, &exctx{db})
 	db.idxs = make(map[string]*index)
 	db.config = Config{
-		SyncPolicy: EverySecond,
-		AutoShrink: defaultAutoShrinkMultiplier,
+		SyncPolicy:           EverySecond,
+		AutoShrinkPercentage: 100,
+		AutoShrinkMinSize:    32 * 1024 * 1024,
 	}
 	db.persist = path != ":memory:"
 	if db.persist {
@@ -142,7 +140,7 @@ func Open(path string) (*DB, error) {
 			return nil, err
 		}
 		if err := db.load(); err != nil {
-			db.file.Close()
+			_ = db.file.Close()
 			return nil, err
 		}
 		db.bufw = bufio.NewWriter(db.file)
@@ -349,9 +347,6 @@ func (db *DB) SetConfig(config Config) error {
 	if db.closed {
 		return ErrDatabaseClosed
 	}
-	if config.AutoShrink < 0 || config.AutoShrink == 1 {
-		return ErrInvalidAutoShrink
-	}
 	switch config.SyncPolicy {
 	default:
 		return ErrInvalidSyncPolicy
@@ -444,14 +439,20 @@ func (db *DB) backgroundManager() {
 	t := time.NewTicker(time.Second)
 	defer t.Stop()
 	for range t.C {
-		multiple := 0
-		autoshink := 0
+		var shrink bool
 		// Open a standard view. This will take a full lock of the
 		// database thus allowing for access to anything we need.
 		err := db.Update(func(tx *Tx) error {
-			autoshink = db.config.AutoShrink
-			if db.keys.Len() > 0 {
-				multiple = db.aoflen / db.keys.Len()
+			if db.persist {
+				pos, err := db.file.Seek(0, 1)
+				if err != nil {
+					return err
+				}
+				aofsz := int(pos)
+				if aofsz > db.config.AutoShrinkMinSize {
+					perc := float64(db.config.AutoShrinkPercentage) / 100.0
+					shrink = aofsz > db.lastaofsz+int(float64(db.lastaofsz)*perc)
+				}
 			}
 			// produce a list of expired items that need removing
 			var remove []*dbItem
@@ -475,7 +476,7 @@ func (db *DB) backgroundManager() {
 			// execute a disk sync.
 			if db.persist && db.config.SyncPolicy == EverySecond &&
 				flushes != db.flushes {
-				db.file.Sync()
+				_ = db.file.Sync()
 				flushes = db.flushes
 			}
 			return nil
@@ -483,7 +484,7 @@ func (db *DB) backgroundManager() {
 		if err == ErrDatabaseClosed {
 			break
 		}
-		if multiple >= autoshink && autoshink > 1 {
+		if shrink {
 			if err = db.Shrink(); err != nil {
 				if err == ErrDatabaseClosed {
 					break
@@ -493,7 +494,7 @@ func (db *DB) backgroundManager() {
 	}
 }
 
-// Shrink will make the database file smaller by removing redundent
+// Shrink will make the database file smaller by removing redundant
 // log entries. This operation does not block the database.
 func (db *DB) Shrink() error {
 	db.mu.Lock()
@@ -522,7 +523,6 @@ func (db *DB) Shrink() error {
 	tmpname := fname + ".tmp"
 	// the endpos is used to return to the end of the file when we are
 	// finished writing all of the current items.
-	aoflen := db.aoflen
 	endpos, err := db.file.Seek(0, 2)
 	if err != nil {
 		return err
@@ -533,13 +533,12 @@ func (db *DB) Shrink() error {
 		return err
 	}
 	defer func() {
-		f.Close()
-		os.RemoveAll(tmpname)
+		_ = f.Close()
+		_ = os.RemoveAll(tmpname)
 	}()
 
 	// we are going to read items in as chunks as to not hold up the database
 	// for too long.
-	naoflen := 0
 	wr := bufio.NewWriter(f)
 	pivot := ""
 	done := false
@@ -561,7 +560,6 @@ func (db *DB) Shrink() error {
 						return false
 					}
 					dbi.writeSetTo(wr)
-					naoflen++
 					n++
 					return true
 				},
@@ -590,7 +588,7 @@ func (db *DB) Shrink() error {
 		if err != nil {
 			return err
 		}
-		defer aof.Close()
+		defer func() { _ = aof.Close() }()
 		if _, err := aof.Seek(endpos, 0); err != nil {
 			return err
 		}
@@ -617,13 +615,13 @@ func (db *DB) Shrink() error {
 		if err != nil {
 			panic(err)
 		}
-		if _, err := db.file.Seek(0, 2); err != nil {
+		pos, err := db.file.Seek(0, 2)
+		if err != nil {
 			return err
 		}
 		// reset the bufio writer
 		db.bufw = bufio.NewWriter(db.file)
-		// finally update the aoflen
-		db.aoflen = naoflen + (db.aoflen - aoflen)
+		db.lastaofsz = int(pos)
 		return nil
 	}()
 	return err
@@ -718,7 +716,6 @@ func (db *DB) load() error {
 		if len(parts) == 0 {
 			continue
 		}
-		db.aoflen++
 		switch strings.ToLower(parts[0]) {
 		default:
 			return ErrInvalid
@@ -750,6 +747,11 @@ func (db *DB) load() error {
 			db.deleteFromDatabase(item)
 		}
 	}
+	pos, err := db.file.Seek(0, 2)
+	if err != nil {
+		return err
+	}
+	db.lastaofsz = int(pos)
 	return nil
 }
 
@@ -764,7 +766,7 @@ func (db *DB) managed(writable bool, fn func(tx *Tx) error) (err error) {
 	defer func() {
 		if err != nil {
 			// The caller returned an error. We must rollback.
-			tx.rollback()
+			_ = tx.rollback()
 			return
 		}
 		if writable {
@@ -914,11 +916,10 @@ func (tx *Tx) commit() error {
 			tx.rollbackInner()
 		}
 		if tx.db.config.SyncPolicy == Always {
-			tx.db.file.Sync()
+			_ = tx.db.file.Sync()
 		}
 		// Increment the number of flushes. The background syncing uses this.
 		tx.db.flushes++
-		tx.db.aoflen += len(tx.commits)
 
 	}
 	// Unlock the database and allow for another writable transaction.
@@ -1405,23 +1406,23 @@ func Rect(min, max []float64) string {
 		}
 	}
 	var b bytes.Buffer
-	b.WriteByte('[')
+	_ = b.WriteByte('[')
 	for i, v := range min {
 		if i > 0 {
-			b.WriteByte(' ')
+			_ = b.WriteByte(' ')
 		}
-		b.WriteString(strconv.FormatFloat(v, 'f', -1, 64))
+		_, _ = b.WriteString(strconv.FormatFloat(v, 'f', -1, 64))
 	}
 	if diff {
-		b.WriteString("],[")
+		_, _ = b.WriteString("],[")
 		for i, v := range max {
 			if i > 0 {
-				b.WriteByte(' ')
+				_ = b.WriteByte(' ')
 			}
-			b.WriteString(strconv.FormatFloat(v, 'f', -1, 64))
+			_, _ = b.WriteString(strconv.FormatFloat(v, 'f', -1, 64))
 		}
 	}
-	b.WriteByte(']')
+	_ = b.WriteByte(']')
 	return b.String()
 }
 
