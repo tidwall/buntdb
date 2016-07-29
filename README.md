@@ -5,6 +5,7 @@
 <br>
 <a href="https://travis-ci.org/tidwall/buntdb"><img src="https://travis-ci.org/tidwall/buntdb.svg?branch=master" alt="Build Status"></a>
 <img src="https://img.shields.io/badge/coverage-96%25-green.svg?style=flat" alt="Code Coverage">
+<a href="https://goreportcard.com/report/github.com/tidwall/buntdb"><img src="https://goreportcard.com/badge/github.com/tidwall/buntdb" alt="Go Report Card"></a>
 <a href="https://godoc.org/github.com/tidwall/buntdb"><img src="https://godoc.org/github.com/tidwall/buntdb?status.svg" alt="GoDoc"></a>
 <!--<img src="https://img.shields.io/badge/version-0.1.0-green.svg" alt="Version">-->
 </p>
