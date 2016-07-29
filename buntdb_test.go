@@ -67,6 +67,9 @@ func TestBackgroudOperations(t *testing.T) {
 		n, err = tx.Len()
 		return err
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if n != 200 {
 		t.Fatalf("expecting '%v', got '%v'", 200, n)
 	}
