@@ -8,7 +8,6 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"sort"
@@ -961,6 +960,23 @@ type dbItem struct {
 	opts     *dbItemOpts // optional meta information
 }
 
+// writeHead writes the resp header part
+func writeHead(wr *bufio.Writer, c byte, n int) {
+	_ = wr.WriteByte(c)
+	_, _ = wr.WriteString(strconv.FormatInt(int64(n), 10))
+	_, _ = wr.WriteString("\r\n")
+}
+
+// writeMultiBulk writes a resp array
+func writeMultiBulk(wr *bufio.Writer, bulks ...string) {
+	writeHead(wr, '*', len(bulks))
+	for _, bulk := range bulks {
+		writeHead(wr, '$', len(bulk))
+		_, _ = wr.WriteString(bulk)
+		_, _ = wr.WriteString("\r\n")
+	}
+}
+
 // writeSetTo writes an item as a single SET record to the a bufio Writer.
 func (dbi *dbItem) writeSetTo(wr *bufio.Writer) {
 	if dbi.opts != nil && dbi.opts.ex {
@@ -968,24 +984,15 @@ func (dbi *dbItem) writeSetTo(wr *bufio.Writer) {
 			uint64(dbi.opts.exat.Sub(time.Now())/time.Second),
 			10,
 		)
-		fmt.Fprintf(wr,
-			"*5\r\n$%d\r\n%s\r\n$%d\r\n%s\r\n"+
-				"$%d\r\n%s\r\n$%d\r\n%s\r\n$%d\r\n%s\r\n",
-			len("set"), "set", len(dbi.key), dbi.key,
-			len(dbi.val), dbi.val, len("ex"), "ex", len(ex), ex,
-		)
+		writeMultiBulk(wr, "set", dbi.key, dbi.val, "ex", ex)
 	} else {
-		fmt.Fprintf(wr, "*3\r\n$%d\r\n%s\r\n$%d\r\n%s\r\n$%d\r\n%s\r\n",
-			len("set"), "set", len(dbi.key), dbi.key, len(dbi.val), dbi.val,
-		)
+		writeMultiBulk(wr, "set", dbi.key, dbi.val)
 	}
 }
 
 // writeSetTo writes an item as a single DEL record to the a bufio Writer.
 func (dbi *dbItem) writeDeleteTo(wr *bufio.Writer) {
-	fmt.Fprintf(wr,
-		"*2\r\n$%d\r\n%s\r\n$%d\r\n%s\r\n",
-		len("del"), "del", len(dbi.key), dbi.key)
+	writeMultiBulk(wr, "del", dbi.key)
 }
 
 // expired evaluates id the item has expired. This will always return false when
