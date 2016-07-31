@@ -111,6 +111,9 @@ type Config struct {
 	// AutoShrinkMinSize defines the minimum size of the aof file before
 	// an automatic shrink can occur.
 	AutoShrinkMinSize int
+
+	// AutoShrinkDisabled turns off automatic background shrinking
+	AutoShrinkDisabled bool
 }
 
 // exctx is a simple b-tree context for ordering by expiration.
@@ -442,7 +445,7 @@ func (db *DB) backgroundManager() {
 		// Open a standard view. This will take a full lock of the
 		// database thus allowing for access to anything we need.
 		err := db.Update(func(tx *Tx) error {
-			if db.persist {
+			if db.persist && !db.config.AutoShrinkDisabled {
 				pos, err := db.file.Seek(0, 1)
 				if err != nil {
 					return err
@@ -575,11 +578,14 @@ func (db *DB) Shrink() error {
 	// We reached this far so all of the items have been written to a new tmp
 	// There's some more work to do by appending the new line from the aof
 	// to the tmp file and finally swap the files out.
-	err = func() error {
+	return func() error {
 		// We're wrapping this in a function to get the benefit of a defered
 		// lock/unlock.
 		db.mu.Lock()
 		defer db.mu.Unlock()
+		if db.closed {
+			return ErrDatabaseClosed
+		}
 		// We are going to open a new version of the aof file so that we do
 		// not change the seek position of the previous. This may cause a
 		// problem in the future if we choose to use syscall file locking.
@@ -606,7 +612,7 @@ func (db *DB) Shrink() error {
 		if err := db.file.Close(); err != nil {
 			return err
 		}
-		// Anything failures below here is really bad. So just panic.
+		// Any failures below here is really bad. So just panic.
 		if err := os.Rename(tmpname, fname); err != nil {
 			panic(err)
 		}
@@ -623,7 +629,6 @@ func (db *DB) Shrink() error {
 		db.lastaofsz = int(pos)
 		return nil
 	}()
-	return err
 }
 func loadReadLine(r *bufio.Reader) (string, error) {
 	line, err := r.ReadBytes('\n')
