@@ -317,7 +317,7 @@ The bracket syntax `[-117 30],[-112 36]` is unique to BuntDB, and it's how the b
 
 **Notice:** The longitude is the Y axis and is on the left, and latitude is the X axis and is on the right.
 
-You can also represent `Infinity` by using `-inf` and `+inf`.
+You can also represent `Infinity` by using `-inf` and `+inf`.  
 For example, you might have the following points (`[X Y M]` where XY is a point and M is a timestamp):
 ```
 [3 9 1]
