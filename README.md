@@ -119,7 +119,7 @@ To set a value you must open a read/write transaction:
 
 ```go
 err := db.Update(func(tx *buntdb.Tx) error {
-    err := tx.Set("mykey", "myvalue", nil)
+    _, _, err := tx.Set("mykey", "myvalue", nil)
     return err
 })
 ```
