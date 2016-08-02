@@ -306,7 +306,7 @@ The bracket syntax `[-117 30],[-112 36]` is unique to BuntDB, and it's how the b
 - **3D rectangle:** `[10 15 12],[20 25 18]`  
 *Min XYZ: "10x15x12", Max XYZ: "20x25x18"*
 
-- **2D point:** `[10 15 12]`  
+- **2D point:** `[10 15]`  
 *XY: "10x15"*
 
 - **LatLon point:** `[-112.2693 33.5123]`  
