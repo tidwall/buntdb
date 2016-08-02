@@ -298,7 +298,7 @@ This will get all three positions.
 
 #### Spatial bracket syntax
 
-The bracket syntax `[-117 30],[-112 36]` is unique to BuntDB, and it's how the built-in rectangles are processed, but you are not limited to this syntax. Whatever Rect function you choose to use during `CreateSpatialIndex` will be used to process the parameter, in this case it's `IndexRect`.
+The bracket syntax `[-117 30],[-112 36]` is unique to BuntDB, and it's how the built-in rectangles are processed. But, you are not limited to this syntax. Whatever Rect function you choose to use during `CreateSpatialIndex` will be used to process the parameter, in this case it's `IndexRect`.
 
 - **2D rectangle:** `[10 15],[20 25]`  
 *Min XY: "10x15", Max XY: "20x25"*
@@ -316,6 +316,40 @@ The bracket syntax `[-117 30],[-112 36]` is unique to BuntDB, and it's how the b
 *Min LatLon: "33.51 -112.26", Max LatLon: "33.67 -112.18"*
 
 **Notice:** The longitude is the Y axis and is on the left, and latitude is the X axis and is on the right.
+
+You can also represent `Infinity` by using `-inf` and `+inf`.
+For example, you might have the following points (`[X Y M]` where XY is a point and M is a timestamp):
+```
+[3 9 1]
+[3 8 2]
+[4 8 3]
+[4 7 4]
+[5 7 5]
+[5 6 6]
+```
+
+You can then do a search for all points with `M` between 2-4 by calling `Intersects`.
+
+```go
+tx.Intersects("points", "[-inf -inf 2],[+inf +inf 4]", func(key, val string) bool {
+    println(val)
+    return true
+})
+```
+
+Which will return:
+
+```
+[3 8 2]
+[4 8 3]
+[4 7 4]
+```
+
+
+
+
+
+
 
 ### Data Expiration
 Items can be automatically evicted by using the `SetOptions` object in the `Set` function to set a `TTL`.
