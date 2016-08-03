@@ -32,12 +32,13 @@ Features
 - In-memory database for [fast reads and writes](#performance)
 - Embeddable with a [simple API](https://godoc.org/github.com/tidwall/buntdb)
 - [Spatial indexing](#spatial-indexes) for up to 20 dimensions; Useful for Geospatial data
+- Index fields inside [JSON](#json-indexes) documents
 - Create [custom indexes](#custom-indexes) for any data type
 - [Built-in types](#built-in-types) that are easy to get up & running; String, Uint, Int, Float
 - Flexible [iteration](#iterating) of data; ascending, descending, and ranges
 - [Durable append-only file](#append-only-file) format for persistence. 
 - Option to evict old items with an [expiration](#data-expiration) TTL
-- Tight codebase, under 1K loc using the `cloc` command
+- Tight codebase, ~1K loc using the `cloc` command
 - ACID semantics with locking [transactions](#transactions) that support rollbacks
 
 Getting Started
@@ -260,7 +261,7 @@ user:1:name 49
 user:4:name 63
 ```
 
-### Spatial Indexes
+## Spatial Indexes
 BuntDB has support for spatial indexes by storing rectangles in an [R-tree](https://en.wikipedia.org/wiki/R-tree). An R-tree is organized in a similar manner as a [B-tree](https://en.wikipedia.org/wiki/B-tree), and both are balanced trees. But, an R-tree is special because it can operate on data that is in multiple dimensions. This is super handy for Geospatial applications.
 
 To create a spatial index use the `CreateSpatialIndex` function:
@@ -296,7 +297,7 @@ db.View(func(tx *buntdb.Tx) error {
 
 This will get all three positions.
 
-#### Spatial bracket syntax
+### Spatial bracket syntax
 
 The bracket syntax `[-117 30],[-112 36]` is unique to BuntDB, and it's how the built-in rectangles are processed. But, you are not limited to this syntax. Whatever Rect function you choose to use during `CreateSpatialIndex` will be used to process the parameter, in this case it's `IndexRect`.
 
@@ -346,9 +347,62 @@ Which will return:
 ```
 
 
+## JSON Indexes
+Indexes can be created on individual fields inside JSON documents.
 
+For example:
 
+```go
+package main
 
+import (
+	"fmt"
+
+	"github.com/tidwall/buntdb"
+)
+
+func main() {
+	db, _ := buntdb.Open(":memory:")
+	db.CreateIndex("last_name", "*", buntdb.IndexJSON("name.last"))
+	db.CreateIndex("age", "*", buntdb.IndexJSON("age"))
+	db.Update(func(tx *buntdb.Tx) error {
+		tx.Set("1", `{"name":{"first":"Tom","last":"Johnson"},"age":38}`, nil)
+		tx.Set("2", `{"name":{"first":"Janet","last":"Prichard"},"age":47}`, nil)
+		tx.Set("3", `{"name":{"first":"Carol","last":"Anderson"},"age":52}`, nil)
+		tx.Set("4", `{"name":{"first":"Alan","last":"Cooper"},"age":28}`, nil)
+		return nil
+	})
+	db.View(func(tx *buntdb.Tx) error {
+		fmt.Println("Order by last name")
+		tx.Ascend("last_name", func(key, value string) bool {
+			fmt.Printf("%s: %s\n", key, value)
+			return true
+		})
+		fmt.Println("Order by age")
+		tx.Ascend("age", func(key, value string) bool {
+			fmt.Printf("%s: %s\n", key, value)
+			return true
+		})
+		return nil
+	})
+}
+```
+
+Results:
+
+```
+Order by last name
+3: {"name":{"first":"Carol","last":"Anderson"},"age":52}
+4: {"name":{"first":"Alan","last":"Cooper"},"age":28}
+1: {"name":{"first":"Tom","last":"Johnson"},"age":38}
+2: {"name":{"first":"Janet","last":"Prichard"},"age":47}
+
+Order by age
+4: {"name":{"first":"Alan","last":"Cooper"},"age":28}
+1: {"name":{"first":"Tom","last":"Johnson"},"age":38}
+2: {"name":{"first":"Janet","last":"Prichard"},"age":47}
+3: {"name":{"first":"Carol","last":"Anderson"},"age":52}
+```
 
 
 ### Data Expiration

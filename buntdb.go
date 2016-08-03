@@ -7,6 +7,7 @@ package buntdb
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -530,6 +531,7 @@ func (db *DB) Shrink() error {
 		return err
 	}
 	db.mu.Unlock()
+	time.Sleep(time.Second / 4) // wait just a bit before starting
 	f, err := os.Create(tmpname)
 	if err != nil {
 		return err
@@ -1529,4 +1531,65 @@ func IndexFloat(a, b string) bool {
 	ia, _ := strconv.ParseFloat(a, 64)
 	ib, _ := strconv.ParseFloat(b, 64)
 	return ia < ib
+}
+
+// IndexJSON provides for the ability to create an index on any JSON field.
+// When the field is a string, the comparison will be case-insensitive.
+// It returns a helper function used by CreateIndex.
+func IndexJSON(path string) func(a, b string) bool {
+	return jsonIndex(path, false)
+}
+
+// IndexJSONCaseSensitive provides for the ability to create an index on
+// any JSON field.
+// When the field is a string, the comparison will be case-sensitive.
+// It returns a helper function used by CreateIndex.
+func IndexJSONCaseSensitive(path string) func(a, b string) bool {
+	return jsonIndex(path, true)
+}
+
+func jsonIndex(path string, cs bool) func(a, b string) bool {
+	return func(a, b string) bool {
+		var am, bm map[string]interface{}
+		_ = json.Unmarshal([]byte(a), &am)
+		_ = json.Unmarshal([]byte(b), &bm)
+		parts := strings.Split(path, ".")
+		for i, part := range parts {
+			if am == nil {
+				if bm == nil {
+					return false
+				}
+				return true
+			} else if bm == nil {
+				return false
+			}
+			if i < len(parts)-1 {
+				am, _ = am[part].(map[string]interface{})
+				bm, _ = bm[part].(map[string]interface{})
+				continue
+			}
+			a, b := am[part], bm[part]
+			switch av := a.(type) {
+			case bool:
+				if bv, ok := b.(bool); ok {
+					return !av && bv
+				}
+			case float64:
+				if bv, ok := b.(float64); ok {
+					return av < bv
+				}
+			case string:
+				if bv, ok := b.(string); ok {
+					if cs {
+						return av < bv
+					}
+					return strings.ToLower(av) < strings.ToLower(bv)
+				}
+			case nil:
+				return b != nil
+			}
+			return false
+		}
+		return false
+	}
 }

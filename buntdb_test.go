@@ -10,20 +10,39 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
 
-func TestBackgroudOperations(t *testing.T) {
+func testOpen(t testing.TB) *DB {
 	if err := os.RemoveAll("data.db"); err != nil {
 		t.Fatal(err)
+	}
+	return testReOpen(t, nil)
+}
+
+func testReOpen(t testing.TB, db *DB) *DB {
+	if db != nil {
+		if err := db.Close(); err != nil {
+			t.Fatal(err)
+		}
 	}
 	db, err := Open("data.db")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = os.RemoveAll("data.db") }()
-	defer func() { _ = db.Close() }()
+	return db
+}
+
+func testClose(db *DB) {
+	_ = db.Close()
+	_ = os.RemoveAll("data.db")
+}
+
+func TestBackgroudOperations(t *testing.T) {
+	db := testOpen(t)
+	defer testClose(db)
 	for i := 0; i < 1000; i++ {
 		if err := db.Update(func(tx *Tx) error {
 			for j := 0; j < 200; j++ {
@@ -40,7 +59,7 @@ func TestBackgroudOperations(t *testing.T) {
 		}
 	}
 	n := 0
-	err = db.View(func(tx *Tx) error {
+	err := db.View(func(tx *Tx) error {
 		var err error
 		n, err = tx.Len()
 		return err
@@ -52,15 +71,8 @@ func TestBackgroudOperations(t *testing.T) {
 		t.Fatalf("expecting '%v', got '%v'", 201, n)
 	}
 	time.Sleep(time.Millisecond * 1500)
-	if err := db.Close(); err != nil {
-		t.Fatal(err)
-	}
-	db, err = Open("data.db")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.RemoveAll("data.db") }()
-	defer func() { _ = db.Close() }()
+	db = testReOpen(t, db)
+	defer testClose(db)
 	n = 0
 	err = db.View(func(tx *Tx) error {
 		var err error
@@ -75,15 +87,8 @@ func TestBackgroudOperations(t *testing.T) {
 	}
 }
 func TestVariousTx(t *testing.T) {
-	if err := os.RemoveAll("data.db"); err != nil {
-		t.Fatal(err)
-	}
-	db, err := Open("data.db")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.RemoveAll("data.db") }()
-	defer func() { _ = db.Close() }()
+	db := testOpen(t)
+	defer testClose(db)
 	if err := db.Update(func(tx *Tx) error {
 		_, _, err := tx.Set("hello", "planet", nil)
 		return err
@@ -98,7 +103,7 @@ func TestVariousTx(t *testing.T) {
 		t.Fatalf("did not correctly receive the user-defined transaction error.")
 	}
 	var val string
-	err = db.View(func(tx *Tx) error {
+	err := db.View(func(tx *Tx) error {
 		var err error
 		val, err = tx.Get("hello")
 		return err
@@ -419,17 +424,10 @@ func TestNoExpiringItem(t *testing.T) {
 	}
 }
 func TestAutoShrink(t *testing.T) {
-	if err := os.RemoveAll("data.db"); err != nil {
-		t.Fatal(err)
-	}
-	db, err := Open("data.db")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.RemoveAll("data.db") }()
-	defer func() { _ = db.Close() }()
+	db := testOpen(t)
+	defer testClose(db)
 	for i := 0; i < 1000; i++ {
-		err = db.Update(func(tx *Tx) error {
+		err := db.Update(func(tx *Tx) error {
 			for i := 0; i < 20; i++ {
 				if _, _, err := tx.Set(fmt.Sprintf("HELLO:%d", i), "WORLD", nil); err != nil {
 					return err
@@ -441,16 +439,11 @@ func TestAutoShrink(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := db.Close(); err != nil {
-		t.Fatal(err)
-	}
-	db, err = Open("data.db")
-	if err != nil {
-		t.Fatal(err)
-	}
+	db = testReOpen(t, db)
+	defer testClose(db)
 	db.config.AutoShrinkMinSize = 64 * 1024 // 64K
 	for i := 0; i < 2000; i++ {
-		err = db.Update(func(tx *Tx) error {
+		err := db.Update(func(tx *Tx) error {
 			for i := 0; i < 20; i++ {
 				if _, _, err := tx.Set(fmt.Sprintf("HELLO:%d", i), "WORLD", nil); err != nil {
 					return err
@@ -463,14 +456,9 @@ func TestAutoShrink(t *testing.T) {
 		}
 	}
 	time.Sleep(time.Second * 3)
-	if err := db.Close(); err != nil {
-		t.Fatal(err)
-	}
-	db, err = Open("data.db")
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = db.View(func(tx *Tx) error {
+	db = testReOpen(t, db)
+	defer testClose(db)
+	err := db.View(func(tx *Tx) error {
 		n, err := tx.Len()
 		if err != nil {
 			return err
@@ -501,12 +489,8 @@ func TestDatabaseFormat(t *testing.T) {
 		if err := ioutil.WriteFile("data.db", []byte(resp), 0666); err != nil {
 			t.Fatal(err)
 		}
-		db, err := Open("data.db")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() { _ = os.RemoveAll("data.db") }()
-		defer func() { _ = db.Close() }()
+		db := testOpen(t)
+		defer testClose(db)
 	}()
 	testBadFormat := func(resp string) {
 		if err := os.RemoveAll("data.db"); err != nil {
@@ -544,15 +528,8 @@ func TestDatabaseFormat(t *testing.T) {
 }
 
 func TestInsertsAndDeleted(t *testing.T) {
-	if err := os.RemoveAll("data.db"); err != nil {
-		t.Fatal(err)
-	}
-	db, err := Open("data.db")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.RemoveAll("data.db") }()
-	defer func() { _ = db.Close() }()
+	db := testOpen(t)
+	defer testClose(db)
 	if err := db.CreateIndex("any", "*", IndexString); err != nil {
 		t.Fatal(err)
 	}
@@ -700,15 +677,8 @@ func TestOpeningClosedDatabase(t *testing.T) {
 
 // test shrinking a database.
 func TestShrink(t *testing.T) {
-	if err := os.RemoveAll("data.db"); err != nil {
-		t.Fatal(err)
-	}
-	db, err := Open("data.db")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.RemoveAll("data.db") }()
-	defer func() { _ = db.Close() }()
+	db := testOpen(t)
+	defer testClose(db)
 	if err := db.Shrink(); err != nil {
 		t.Fatal(err)
 	}
@@ -820,17 +790,10 @@ func TestShrink(t *testing.T) {
 }
 
 func TestVariousIndexOperations(t *testing.T) {
-	if err := os.RemoveAll("data.db"); err != nil {
-		t.Fatal(err)
-	}
-	db, err := Open("data.db")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.RemoveAll("data.db") }()
-	defer func() { _ = db.Close() }()
+	db := testOpen(t)
+	defer testClose(db)
 	// test creating an index with no index name.
-	err = db.CreateIndex("", "", nil)
+	err := db.CreateIndex("", "", nil)
 	if err == nil {
 		t.Fatal("should not be able to create an index with no name")
 	}
@@ -939,15 +902,8 @@ func TestPatternMatching(t *testing.T) {
 
 func TestBasic(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
-	if err := os.RemoveAll("data.db"); err != nil {
-		t.Fatal(err)
-	}
-	db, err := Open("data.db")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.RemoveAll("data.db") }()
-	defer func() { _ = db.Close() }()
+	db := testOpen(t)
+	defer testClose(db)
 
 	// create a simple index
 	if err := db.CreateIndex("users", "fun:user:*", IndexString); err != nil {
@@ -1019,8 +975,8 @@ func TestBasic(t *testing.T) {
 	}
 	// verify the data has been created
 	buf := &bytes.Buffer{}
-	err = db.View(func(tx *Tx) error {
-		err = tx.Ascend("users", func(key, val string) bool {
+	err := db.View(func(tx *Tx) error {
+		err := tx.Ascend("users", func(key, val string) bool {
 			fmt.Fprintf(buf, "%s %s\n", key, val)
 			return true
 		})
@@ -1151,16 +1107,9 @@ func TestRectStrings(t *testing.T) {
 }
 
 func TestTTL(t *testing.T) {
-	if err := os.RemoveAll("data.db"); err != nil {
-		t.Fatal(err)
-	}
-	db, err := Open("data.db")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.RemoveAll("data.db") }()
-	defer func() { _ = db.Close() }()
-	err = db.Update(func(tx *Tx) error {
+	db := testOpen(t)
+	defer testClose(db)
+	err := db.Update(func(tx *Tx) error {
 		if _, _, err := tx.Set("key1", "val1", &SetOptions{Expires: true, TTL: time.Second}); err != nil {
 			return err
 		}
@@ -1195,17 +1144,10 @@ func TestTTL(t *testing.T) {
 }
 
 func TestConfig(t *testing.T) {
-	if err := os.RemoveAll("data.db"); err != nil {
-		t.Fatal(err)
-	}
-	db, err := Open("data.db")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.RemoveAll("data.db") }()
-	defer func() { _ = db.Close() }()
+	db := testOpen(t)
+	defer testClose(db)
 
-	err = db.SetConfig(Config{SyncPolicy: SyncPolicy(-1)})
+	err := db.SetConfig(Config{SyncPolicy: SyncPolicy(-1)})
 	if err == nil {
 		t.Fatal("expecting a config syncpolicy error")
 	}
@@ -1477,3 +1419,128 @@ func Benchmark_Spatial_2D(t *testing.B) {
 
 }
 */
+func TestCoverCloseAlreadyClosed(t *testing.T) {
+	db := testOpen(t)
+	defer testClose(db)
+	_ = db.file.Close()
+	if err := db.Close(); err == nil {
+		t.Fatal("expecting an error")
+	}
+}
+
+func TestCoverConfigClosed(t *testing.T) {
+	db := testOpen(t)
+	defer testClose(db)
+	_ = db.Close()
+	var config Config
+	if err := db.ReadConfig(&config); err != ErrDatabaseClosed {
+		t.Fatal("expecting database closed error")
+	}
+	if err := db.SetConfig(config); err != ErrDatabaseClosed {
+		t.Fatal("expecting database closed error")
+	}
+}
+func TestCoverShrinkShrink(t *testing.T) {
+	db := testOpen(t)
+	defer testClose(db)
+	if err := db.Update(func(tx *Tx) error {
+		for i := 0; i < 10000; i++ {
+			_, _, err := tx.Set(fmt.Sprintf("%d", i), fmt.Sprintf("%d", i), nil)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Update(func(tx *Tx) error {
+		for i := 250; i < 250+100; i++ {
+			_, err := tx.Delete(fmt.Sprintf("%d", i))
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var err1, err2 error
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		err1 = db.Shrink()
+	}()
+	go func() {
+		defer wg.Done()
+		err2 = db.Shrink()
+	}()
+	wg.Wait()
+	//println(123)
+	//fmt.Printf("%v\n%v\n", err1, err2)
+	if err1 != ErrShrinkInProcess && err2 != ErrShrinkInProcess {
+		t.Fatal("expecting a shrink in process error")
+	}
+	db = testReOpen(t, db)
+	defer testClose(db)
+	if err := db.View(func(tx *Tx) error {
+		n, err := tx.Len()
+		if err != nil {
+			return err
+		}
+		if n != 9900 {
+			t.Fatal("expecting 9900 items")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestJSONIndex(t *testing.T) {
+	db := testOpen(t)
+	defer testClose(db)
+
+	_ = db.CreateIndex("last_name", "*", IndexJSON("name.last"))
+	_ = db.CreateIndex("last_name_cs", "*", IndexJSONCaseSensitive("name.last"))
+	_ = db.CreateIndex("age", "*", IndexJSON("age"))
+	_ = db.CreateIndex("student", "*", IndexJSON("student"))
+	_ = db.Update(func(tx *Tx) error {
+		_, _, _ = tx.Set("1", `{"name":{"first":"Tom","last":"Johnson"},"age":38,"student":false}`, nil)
+		_, _, _ = tx.Set("2", `{"name":{"first":"Janet","last":"Prichard"},"age":47,"student":true}`, nil)
+		_, _, _ = tx.Set("3", `{"name":{"first":"Carol","last":"Anderson"},"age":52,"student":true}`, nil)
+		_, _, _ = tx.Set("4", `{"name":{"first":"Alan","last":"Cooper"},"age":28,"student":false}`, nil)
+		_, _, _ = tx.Set("5", `{"name":{"first":"bill","last":"frank"},"age":21,"student":true}`, nil)
+		_, _, _ = tx.Set("6", `{"name":{"first":"sally","last":"randall"},"age":68,"student":false}`, nil)
+		return nil
+	})
+	var keys []string
+	_ = db.View(func(tx *Tx) error {
+		_ = tx.Ascend("last_name_cs", func(key, value string) bool {
+			//fmt.Printf("%s: %s\n", key, value)
+			keys = append(keys, key)
+			return true
+		})
+		_ = tx.Ascend("last_name", func(key, value string) bool {
+			//fmt.Printf("%s: %s\n", key, value)
+			keys = append(keys, key)
+			return true
+		})
+		_ = tx.Ascend("age", func(key, value string) bool {
+			//fmt.Printf("%s: %s\n", key, value)
+			keys = append(keys, key)
+			return true
+		})
+		_ = tx.Ascend("student", func(key, value string) bool {
+			//fmt.Printf("%s: %s\n", key, value)
+			keys = append(keys, key)
+			return true
+		})
+		return nil
+	})
+	expect := "3,4,1,2,5,6,3,4,5,1,2,6,5,4,1,2,3,6,1,4,6,2,3,5"
+	if strings.Join(keys, ",") != expect {
+		t.Fatalf("expected %v, got %v", expect, strings.Join(keys, ","))
+	}
+}
