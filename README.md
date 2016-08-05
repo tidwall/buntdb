@@ -405,7 +405,7 @@ Order by age
 ```
 
 
-### Data Expiration
+## Data Expiration
 Items can be automatically evicted by using the `SetOptions` object in the `Set` function to set a `TTL`.
 
 ```go
