@@ -1483,20 +1483,46 @@ func IndexRect(a string) (min, max []float64) {
 // This is a case-insensitive comparison. Use the IndexBinary() for comparing
 // case-sensitive strings.
 func IndexString(a, b string) bool {
-	// This is a faster approach to strings.ToLower because it does not
-	// create new strings.
 	for i := 0; i < len(a) && i < len(b); i++ {
-		ca, cb := a[i], b[i]
-		if ca >= 'A' && ca <= 'Z' {
-			ca += 32
-		}
-		if cb >= 'A' && cb <= 'Z' {
-			cb += 32
-		}
-		if ca < cb {
-			return true
-		} else if ca > cb {
-			return false
+		if a[i] >= 'A' && a[i] <= 'Z' {
+			if b[i] >= 'A' && b[i] <= 'Z' {
+				// both are uppercase, do nothing
+				if a[i] < b[i] {
+					return true
+				} else if a[i] > b[i] {
+					return false
+				}
+			} else {
+				// a is uppercase, convert a to lowercase
+				if a[i]+32 < b[i] {
+					return true
+				} else if a[i]+32 > b[i] {
+					return false
+				}
+			}
+		} else if b[i] >= 'A' && b[i] <= 'Z' {
+			if a[i] >= 'A' && a[i] <= 'Z' {
+				// both are uppercase, do nothing
+				if a[i] < b[i] {
+					return true
+				} else if a[i] > b[i] {
+					return false
+				}
+			} else {
+				// b is uppercase, convert b to lowercase
+				if a[i] < b[i]+32 {
+					return true
+				} else if a[i] > b[i]+32 {
+					return false
+				}
+			}
+		} else {
+			// neither are uppercase
+			if a[i] < b[i] {
+				return true
+			} else if a[i] > b[i] {
+				return false
+			}
 		}
 	}
 	return len(a) < len(b)
