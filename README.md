@@ -49,7 +49,7 @@ Getting Started
 To start using BuntDB, install Go and run `go get`:
 
 ```sh
-$ go get github.com/tidwall/buntdb
+$ go get -u github.com/tidwall/buntdb
 ```
 
 This will retrieve the library.
