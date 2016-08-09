@@ -1230,8 +1230,13 @@ func (tx *Tx) scan(
 	// create some limit items
 	var itemA, itemB *dbItem
 	if gt || lt {
-		itemA = &dbItem{key: start}
-		itemB = &dbItem{key: stop}
+		if index == "" {
+			itemA = &dbItem{key: start}
+			itemB = &dbItem{key: stop}
+		} else {
+			itemA = &dbItem{val: start}
+			itemB = &dbItem{val: stop}
+		}
 	}
 	// execute the scan on the underlying tree.
 	if desc {
