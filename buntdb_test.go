@@ -1060,6 +1060,88 @@ rect:2: [15 15],[24 24]
 		t.Fatalf("expected [%v], got [%v]", strings.TrimSpace(res), strings.TrimSpace(buf.String()))
 	}
 }
+
+func TestIndexAscend(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
+	db := testOpen(t)
+	defer testClose(db)
+
+	// create a simple index
+	if err := db.CreateIndex("usr", "usr:*", IndexInt); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Update(func(tx *Tx) error {
+		for i := 10; i > 0; i-- {
+			tx.Set(fmt.Sprintf("usr:%d", i), fmt.Sprintf("%d", 10-i), nil)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	buf := &bytes.Buffer{}
+	err := db.View(func(tx *Tx) error {
+		tx.Ascend("usr", func(key, value string) bool {
+			fmt.Fprintf(buf, "%s %s\n", key, value)
+			return true
+		})
+		fmt.Fprintln(buf)
+
+		tx.AscendGreaterOrEqual("usr", "8", func(key, value string) bool {
+			fmt.Fprintf(buf, "%s %s\n", key, value)
+			return true
+		})
+		fmt.Fprintln(buf)
+
+		tx.AscendLessThan("usr", "3", func(key, value string) bool {
+			fmt.Fprintf(buf, "%s %s\n", key, value)
+			return true
+		})
+		fmt.Fprintln(buf)
+
+		tx.AscendRange("usr", "4", "8", func(key, value string) bool {
+			fmt.Fprintf(buf, "%s %s\n", key, value)
+			return true
+		})
+		return nil
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res := `
+usr:10 0
+usr:9 1
+usr:8 2
+usr:7 3
+usr:6 4
+usr:5 5
+usr:4 6
+usr:3 7
+usr:2 8
+usr:1 9
+
+usr:2 8
+usr:1 9
+
+usr:10 0
+usr:9 1
+usr:8 2
+
+usr:6 4
+usr:5 5
+usr:4 6
+usr:3 7
+`
+	res = strings.Replace(res, "\r", "", -1)
+	s1 := strings.TrimSpace(buf.String())
+	s2 := strings.TrimSpace(res)
+	if s1 != s2 {
+		t.Fatalf("expected [%v], got [%v]", s1, s2)
+	}
+}
+
 func testRectStringer(min, max []float64) error {
 	nmin, nmax := IndexRect(Rect(min, max))
 	if len(nmin) != len(min) {
