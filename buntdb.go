@@ -7,7 +7,6 @@ package buntdb
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -18,6 +17,7 @@ import (
 	"time"
 
 	"github.com/tidwall/btree"
+	"github.com/tidwall/gjson"
 	"github.com/tidwall/rtree"
 )
 
@@ -1506,20 +1506,11 @@ func IndexString(a, b string) bool {
 				}
 			}
 		} else if b[i] >= 'A' && b[i] <= 'Z' {
-			if a[i] >= 'A' && a[i] <= 'Z' {
-				// both are uppercase, do nothing
-				if a[i] < b[i] {
-					return true
-				} else if a[i] > b[i] {
-					return false
-				}
-			} else {
-				// b is uppercase, convert b to lowercase
-				if a[i] < b[i]+32 {
-					return true
-				} else if a[i] > b[i]+32 {
-					return false
-				}
+			// b is uppercase, convert b to lowercase
+			if a[i] < b[i]+32 {
+				return true
+			} else if a[i] > b[i]+32 {
+				return false
 			}
 		} else {
 			// neither are uppercase
@@ -1568,7 +1559,7 @@ func IndexFloat(a, b string) bool {
 // When the field is a string, the comparison will be case-insensitive.
 // It returns a helper function used by CreateIndex.
 func IndexJSON(path string) func(a, b string) bool {
-	return jsonIndex(path, false)
+	return jsonIndex(false, path)
 }
 
 // IndexJSONCaseSensitive provides for the ability to create an index on
@@ -1576,50 +1567,15 @@ func IndexJSON(path string) func(a, b string) bool {
 // When the field is a string, the comparison will be case-sensitive.
 // It returns a helper function used by CreateIndex.
 func IndexJSONCaseSensitive(path string) func(a, b string) bool {
-	return jsonIndex(path, true)
+	return jsonIndex(true, path)
 }
 
-func jsonIndex(path string, cs bool) func(a, b string) bool {
+func jsonIndex(cs bool, path string) func(a, b string) bool {
 	return func(a, b string) bool {
-		var am, bm map[string]interface{}
-		_ = json.Unmarshal([]byte(a), &am)
-		_ = json.Unmarshal([]byte(b), &bm)
-		parts := strings.Split(path, ".")
-		for i, part := range parts {
-			if am == nil {
-				if bm == nil {
-					return false
-				}
-				return true
-			} else if bm == nil {
-				return false
-			}
-			if i < len(parts)-1 {
-				am, _ = am[part].(map[string]interface{})
-				bm, _ = bm[part].(map[string]interface{})
-				continue
-			}
-			a, b := am[part], bm[part]
-			switch av := a.(type) {
-			case bool:
-				if bv, ok := b.(bool); ok {
-					return !av && bv
-				}
-			case float64:
-				if bv, ok := b.(float64); ok {
-					return av < bv
-				}
-			case string:
-				if bv, ok := b.(string); ok {
-					if cs {
-						return av < bv
-					}
-					return strings.ToLower(av) < strings.ToLower(bv)
-				}
-			case nil:
-				return b != nil
-			}
-			return false
+		atok := gjson.Get(a, path)
+		btok := gjson.Get(b, path)
+		if atok.Less(btok, cs) {
+			return true
 		}
 		return false
 	}
