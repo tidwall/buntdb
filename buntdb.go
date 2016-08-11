@@ -1572,11 +1572,6 @@ func IndexJSONCaseSensitive(path string) func(a, b string) bool {
 
 func jsonIndex(cs bool, path string) func(a, b string) bool {
 	return func(a, b string) bool {
-		atok := gjson.Get(a, path)
-		btok := gjson.Get(b, path)
-		if atok.Less(btok, cs) {
-			return true
-		}
-		return false
+		return gjson.Get(a, path).Less(gjson.Get(b, path), cs)
 	}
 }
