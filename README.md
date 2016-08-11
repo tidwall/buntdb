@@ -348,7 +348,7 @@ Which will return:
 
 
 ## JSON Indexes
-Indexes can be created on individual fields inside JSON documents. BuntDB uses [GJSON](https://github.com/tidwall/gjson) for under the hood.
+Indexes can be created on individual fields inside JSON documents. BuntDB uses [GJSON](https://github.com/tidwall/gjson) under the hood.
 
 For example:
 
