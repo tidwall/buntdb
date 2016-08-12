@@ -632,73 +632,8 @@ func (db *DB) Shrink() error {
 		return nil
 	}()
 }
-func loadReadLine(r *bufio.Reader) (string, error) {
-	line, err := r.ReadBytes('\n')
-	if err != nil {
-		return "", err
-	}
-	if len(line) < 2 || line[len(line)-2] != '\r' {
-		return "", ErrInvalid
-	}
-	return string(line[:len(line)-2]), nil
-}
-func loadReadLineNum(r *bufio.Reader) (int, error) {
-	line, err := loadReadLine(r)
-	if err != nil {
-		return 0, err
-	}
-	n, err := strconv.ParseUint(line, 10, 64)
-	if err != nil {
-		return 0, err
-	}
-	return int(n), nil
-}
 
 var errValidEOF = errors.New("valid eof")
-
-func loadReadCommand(r *bufio.Reader) ([]string, error) {
-	c, err := r.ReadByte()
-	if err != nil {
-		if err == io.EOF {
-			return nil, errValidEOF
-		}
-		return nil, err
-	}
-	if c != '*' {
-		return nil, ErrInvalid
-	}
-	n, err := loadReadLineNum(r)
-	if err != nil {
-		return nil, err
-	}
-	parts := make([]string, n)
-	for i := 0; i < len(parts); i++ {
-		c, err := r.ReadByte()
-		if err != nil {
-			return nil, err
-		}
-		if c != '$' {
-			return nil, ErrInvalid
-		}
-		n, err := loadReadLineNum(r)
-		if err != nil {
-			return nil, err
-		}
-		data := make([]byte, n)
-		if _, err = io.ReadFull(r, data); err != nil {
-			return nil, err
-		}
-		eol := make([]byte, 2)
-		if _, err = io.ReadFull(r, eol); err != nil {
-			return nil, err
-		}
-		if eol[0] != '\r' || eol[1] != '\n' {
-			return nil, ErrInvalid
-		}
-		parts[i] = string(data)
-	}
-	return parts, nil
-}
 
 // load reads entries from the append only database file and fills the database.
 // The file format uses the Redis append only file format, which is and a series
@@ -706,26 +641,92 @@ func loadReadCommand(r *bufio.Reader) ([]string, error) {
 // http://redis.io/topics/protocol. The only supported RESP commands are DEL and
 // SET.
 func (db *DB) load() error {
+	parts := make([]string, 0, 8)
 	r := bufio.NewReader(db.file)
 	for {
 		var item = &dbItem{}
-		parts, err := loadReadCommand(r)
+		// read command
+		// read *num\r\n
+		line, err := r.ReadBytes('\n')
 		if err != nil {
-			if err == errValidEOF {
-				break
+			if len(line) > 0 {
+				return io.ErrUnexpectedEOF
 			}
 			if err == io.EOF {
-				return io.ErrUnexpectedEOF
+				return nil
 			}
 			return err
 		}
+		if line[0] != '*' {
+			return ErrInvalid
+		}
+		var n int
+		if len(line) == 4 && line[len(line)-2] == '\r' {
+			if line[1] < '0' || line[1] > '9' {
+				return ErrInvalid
+			}
+			n = int(line[1] - '0')
+		} else {
+			if len(line) < 5 || line[len(line)-2] != '\r' {
+				return ErrInvalid
+			}
+			for i := 1; i < len(line)-2; i++ {
+				if line[i] < '0' || line[i] > '9' {
+					return ErrInvalid
+				}
+				n = n*10 + int(line[i]-'0')
+			}
+		}
+		// read the parts of the command
+
+		parts = parts[:0]
+		for i := 0; i < n; i++ {
+			// read $num\r\n
+			line, err := r.ReadBytes('\n')
+			if err != nil {
+				return err
+			}
+			if line[0] != '$' {
+				return ErrInvalid
+			}
+			var n int
+			if len(line) == 4 && line[len(line)-2] == '\r' {
+				if line[1] < '0' || line[1] > '9' {
+					return ErrInvalid
+				}
+				n = int(line[1] - '0')
+			} else {
+				if len(line) < 5 || line[len(line)-2] != '\r' {
+					return ErrInvalid
+				}
+				for i := 1; i < len(line)-2; i++ {
+					if line[i] < '0' || line[i] > '9' {
+						return ErrInvalid
+					}
+					n = n*10 + int(line[i]-'0')
+				}
+			}
+			data := make([]byte, n+2)
+			if _, err = io.ReadFull(r, data); err != nil {
+				return err
+			}
+			if data[len(data)-2] != '\r' || data[len(data)-1] != '\n' {
+				return ErrInvalid
+			}
+			parts = append(parts, string(data[:len(data)-2]))
+		}
+		// finished reading the command
+
 		if len(parts) == 0 {
 			continue
 		}
-		switch strings.ToLower(parts[0]) {
-		default:
+		if len(parts[0]) != 3 {
 			return ErrInvalid
-		case "set":
+		}
+		if (parts[0][0] == 's' || parts[0][1] == 'S') &&
+			(parts[0][1] == 'e' || parts[0][1] == 'E') &&
+			(parts[0][2] == 't' || parts[0][2] == 'T') {
+			// SET
 			if len(parts) < 3 || len(parts) == 4 || len(parts) > 5 {
 				return ErrInvalid
 			}
@@ -745,12 +746,17 @@ func (db *DB) load() error {
 				}
 			}
 			db.insertIntoDatabase(item)
-		case "del":
+		} else if (parts[0][0] == 'd' || parts[0][1] == 'D') &&
+			(parts[0][1] == 'e' || parts[0][1] == 'E') &&
+			(parts[0][2] == 'l' || parts[0][2] == 'L') {
+			// DEL
 			if len(parts) != 2 {
 				return ErrInvalid
 			}
 			item.key = parts[1]
 			db.deleteFromDatabase(item)
+		} else {
+			return ErrInvalid
 		}
 	}
 	pos, err := db.file.Seek(0, 2)
