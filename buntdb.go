@@ -122,12 +122,15 @@ type exctx struct {
 	db *DB
 }
 
+// Default number of btree degrees
+const btreeDegrees = 64
+
 // Open opens a database at the provided path.
 // If the file does not exist then it will be created automatically.
 func Open(path string) (*DB, error) {
 	db := &DB{}
-	db.keys = btree.New(16, nil)
-	db.exps = btree.New(16, &exctx{db})
+	db.keys = btree.New(btreeDegrees, nil)
+	db.exps = btree.New(btreeDegrees, &exctx{db})
 	db.idxs = make(map[string]*index)
 	db.config = Config{
 		SyncPolicy:           EverySecond,
@@ -248,7 +251,7 @@ func (db *DB) createIndex(
 		db:      db,
 	}
 	if less != nil {
-		idx.btr = btree.New(16, idx)
+		idx.btr = btree.New(btreeDegrees, idx)
 	}
 	if rect != nil {
 		idx.rtr = rtree.New(idx)
