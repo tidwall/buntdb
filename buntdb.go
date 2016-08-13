@@ -644,15 +644,16 @@ var errValidEOF = errors.New("valid eof")
 // http://redis.io/topics/protocol. The only supported RESP commands are DEL and
 // SET.
 func (db *DB) load() error {
+	data := make([]byte, 4096)
 	parts := make([]string, 0, 8)
 	r := bufio.NewReader(db.file)
 	for {
-		var item = &dbItem{}
-		// read command
-		// read *num\r\n
+		// read a single command.
+		// first we should read the number of parts that the of the command
 		line, err := r.ReadBytes('\n')
 		if err != nil {
 			if len(line) > 0 {
+				// got an eof but also data. this should be an unexpected eof.
 				return io.ErrUnexpectedEOF
 			}
 			if err == io.EOF {
@@ -663,6 +664,7 @@ func (db *DB) load() error {
 		if line[0] != '*' {
 			return ErrInvalid
 		}
+		// convert the string number to and int
 		var n int
 		if len(line) == 4 && line[len(line)-2] == '\r' {
 			if line[1] < '0' || line[1] > '9' {
@@ -680,11 +682,10 @@ func (db *DB) load() error {
 				n = n*10 + int(line[i]-'0')
 			}
 		}
-		// read the parts of the command
-
+		// read each part of the command.
 		parts = parts[:0]
 		for i := 0; i < n; i++ {
-			// read $num\r\n
+			// read the number of bytes of the part.
 			line, err := r.ReadBytes('\n')
 			if err != nil {
 				return err
@@ -692,6 +693,7 @@ func (db *DB) load() error {
 			if line[0] != '$' {
 				return ErrInvalid
 			}
+			// convert the string number to and int
 			var n int
 			if len(line) == 4 && line[len(line)-2] == '\r' {
 				if line[1] < '0' || line[1] > '9' {
@@ -709,14 +711,22 @@ func (db *DB) load() error {
 					n = n*10 + int(line[i]-'0')
 				}
 			}
-			data := make([]byte, n+2)
-			if _, err = io.ReadFull(r, data); err != nil {
+			// resize the read buffer
+			if len(data) < n+2 {
+				dataln := len(data)
+				for len(data) < n+2 {
+					dataln *= 2
+				}
+				data = make([]byte, dataln)
+			}
+			if _, err = io.ReadFull(r, data[:n+2]); err != nil {
 				return err
 			}
-			if data[len(data)-2] != '\r' || data[len(data)-1] != '\n' {
+			if data[n] != '\r' || data[n+1] != '\n' {
 				return ErrInvalid
 			}
-			parts = append(parts, string(data[:len(data)-2]))
+			// copy string
+			parts = append(parts, string(append([]byte{}, data[:n]...)))
 		}
 		// finished reading the command
 
@@ -733,7 +743,6 @@ func (db *DB) load() error {
 			if len(parts) < 3 || len(parts) == 4 || len(parts) > 5 {
 				return ErrInvalid
 			}
-			item.key, item.val = parts[1], parts[2]
 			if len(parts) == 5 {
 				if strings.ToLower(parts[3]) != "ex" {
 					return ErrInvalid
@@ -743,12 +752,17 @@ func (db *DB) load() error {
 					return err
 				}
 				dur := time.Duration(ex) * time.Second
-				item.opts = &dbItemOpts{
-					ex:   true,
-					exat: time.Now().Add(dur),
-				}
+				db.insertIntoDatabase(&dbItem{
+					key: parts[1],
+					val: parts[2],
+					opts: &dbItemOpts{
+						ex:   true,
+						exat: time.Now().Add(dur),
+					},
+				})
+			} else {
+				db.insertIntoDatabase(&dbItem{key: parts[1], val: parts[2]})
 			}
-			db.insertIntoDatabase(item)
 		} else if (parts[0][0] == 'd' || parts[0][1] == 'D') &&
 			(parts[0][1] == 'e' || parts[0][1] == 'E') &&
 			(parts[0][2] == 'l' || parts[0][2] == 'L') {
@@ -756,8 +770,7 @@ func (db *DB) load() error {
 			if len(parts) != 2 {
 				return ErrInvalid
 			}
-			item.key = parts[1]
-			db.deleteFromDatabase(item)
+			db.deleteFromDatabase(&dbItem{key: parts[1]})
 		} else {
 			return ErrInvalid
 		}
