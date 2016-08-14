@@ -657,7 +657,7 @@ func (db *DB) load() error {
 				return io.ErrUnexpectedEOF
 			}
 			if err == io.EOF {
-				return nil
+				break
 			}
 			return err
 		}
