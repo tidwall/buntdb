@@ -714,7 +714,7 @@ func (db *DB) load() error {
 			// resize the read buffer
 			if len(data) < n+2 {
 				dataln := len(data)
-				for len(data) < n+2 {
+				for dataln < n+2 {
 					dataln *= 2
 				}
 				data = make([]byte, dataln)
@@ -1581,7 +1581,9 @@ func IndexFloat(a, b string) bool {
 // When the field is a string, the comparison will be case-insensitive.
 // It returns a helper function used by CreateIndex.
 func IndexJSON(path string) func(a, b string) bool {
-	return jsonIndex(false, path)
+	return func(a, b string) bool {
+		return gjson.Get(a, path).Less(gjson.Get(b, path), false)
+	}
 }
 
 // IndexJSONCaseSensitive provides for the ability to create an index on
@@ -1589,11 +1591,7 @@ func IndexJSON(path string) func(a, b string) bool {
 // When the field is a string, the comparison will be case-sensitive.
 // It returns a helper function used by CreateIndex.
 func IndexJSONCaseSensitive(path string) func(a, b string) bool {
-	return jsonIndex(true, path)
-}
-
-func jsonIndex(cs bool, path string) func(a, b string) bool {
 	return func(a, b string) bool {
-		return gjson.Get(a, path).Less(gjson.Get(b, path), cs)
+		return gjson.Get(a, path).Less(gjson.Get(b, path), true)
 	}
 }

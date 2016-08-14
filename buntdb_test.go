@@ -525,6 +525,11 @@ func TestDatabaseFormat(t *testing.T) {
 	testBadFormat("*1\r\n$3\r\nset\r\n")
 	testBadFormat("*5\r\n$3\r\nset\r\n$3\r\nvar\r\n$3\r\nval\r\n$2\r\nxx\r\n$2\r\n10\r\n")
 	testBadFormat("*5\r\n$3\r\nset\r\n$3\r\nvar\r\n$3\r\nval\r\n$2\r\nex\r\n$2\r\naa\r\n")
+	testBadFormat("*15\r\n$3\r\nset\r\n$3\r\nvar\r\n$3\r\nval\r\n$2\r\nex\r\n$2\r\naa\r\n")
+	testBadFormat("*1A\r\n$3\r\nset\r\n$3\r\nvar\r\n$3\r\nval\r\n$2\r\nex\r\n$2\r\naa\r\n")
+	testBadFormat("*5\r\n$13\r\nset\r\n$3\r\nvar\r\n$3\r\nval\r\n$2\r\nex\r\n$2\r\naa\r\n")
+	testBadFormat("*5\r\n$1A\r\nset\r\n$3\r\nvar\r\n$3\r\nval\r\n$2\r\nex\r\n$2\r\naa\r\n")
+	testBadFormat("*5\r\n$3\r\nset\r\n$5000\r\nvar\r\n$3\r\nval\r\n$2\r\nex\r\n$2\r\naa\r\n")
 }
 
 func TestInsertsAndDeleted(t *testing.T) {
