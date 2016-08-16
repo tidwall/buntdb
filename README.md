@@ -382,6 +382,11 @@ func main() {
 			fmt.Printf("%s: %s\n", key, value)
 			return true
 		})
+		fmt.Println("Order by age range 30-50")
+		tx.AscendRange("age", `{"age":30}`, `{"age":50}`, func(key, value string) bool {
+			fmt.Printf("%s: %s\n", key, value)
+			return true
+		})
 		return nil
 	})
 }
@@ -401,8 +406,11 @@ Order by age
 1: {"name":{"first":"Tom","last":"Johnson"},"age":38}
 2: {"name":{"first":"Janet","last":"Prichard"},"age":47}
 3: {"name":{"first":"Carol","last":"Anderson"},"age":52}
-```
 
+Order by age range 30-50
+1: {"name":{"first":"Tom","last":"Johnson"},"age":38}
+2: {"name":{"first":"Janet","last":"Prichard"},"age":47}
+```
 
 ## Data Expiration
 Items can be automatically evicted by using the `SetOptions` object in the `Set` function to set a `TTL`.
