@@ -89,7 +89,7 @@ const (
 	// This is the recommended setting.
 	EverySecond = 1
 	// Always is used to sync data after every write to disk.
-	// Very very slow. Very safe.
+	// Slow. Very safe.
 	Always = 2
 )
 
@@ -202,7 +202,7 @@ type index struct {
 // There are some default less function that can be used such as
 // IndexString, IndexBinary, etc.
 func (db *DB) CreateIndex(name, pattern string,
-	less func(a, b string) bool) error {
+	less ...func(a, b string) bool) error {
 	return db.createIndex(name, pattern, less, nil)
 }
 
@@ -229,7 +229,7 @@ func (db *DB) CreateSpatialIndex(name, pattern string,
 func (db *DB) createIndex(
 	name string,
 	pattern string,
-	less func(a, b string) bool,
+	lessers []func(a, b string) bool,
 	rect func(item string) (min, max []float64),
 ) error {
 	db.mu.Lock()
@@ -242,6 +242,25 @@ func (db *DB) createIndex(
 	}
 	if _, ok := db.idxs[name]; ok {
 		return ErrIndexExists
+	}
+	var less func(a, b string) bool
+	switch len(lessers) {
+	default:
+		less = func(a, b string) bool {
+			for i := 0; i < len(lessers)-1; i++ {
+				if lessers[i](a, b) {
+					return true
+				}
+				if lessers[i](b, a) {
+					return false
+				}
+			}
+			return lessers[len(lessers)-1](a, b)
+		}
+	case 0:
+		less = func(a, b string) bool { return false }
+	case 1:
+		less = lessers[0]
 	}
 	idx := &index{
 		name:    name,

@@ -33,6 +33,7 @@ Features
 - [Spatial indexing](#spatial-indexes) for up to 20 dimensions; Useful for Geospatial data
 - Index fields inside [JSON](#json-indexes) documents
 - Create [custom indexes](#custom-indexes) for any data type
+- Support for [multi value indexes](#multi-value-index); Similar to a SQL multi column index
 - [Built-in types](#built-in-types) that are easy to get up & running; String, Uint, Int, Float
 - Flexible [iteration](#iterating) of data; ascending, descending, and ranges
 - [Durable append-only file](#append-only-file) format for persistence. 
@@ -411,6 +412,41 @@ Order by age range 30-50
 1: {"name":{"first":"Tom","last":"Johnson"},"age":38}
 2: {"name":{"first":"Janet","last":"Prichard"},"age":47}
 ```
+## Multi Value Index
+With BuntDB it's possible to join multiple values on a single index. 
+This is similar to a [multi column index](http://dev.mysql.com/doc/refman/5.7/en/multiple-column-indexes.html) in a traditional SQL database.
+
+In this example we are creating a multi value index on "name.last" and "age":
+
+```go
+	db, _ := buntdb.Open(":memory:")
+	db.CreateIndex("last_name_age", "*", buntdb.IndexJSON("name.last"), buntdb.IndexJSON("age"))
+	db.Update(func(tx *buntdb.Tx) error {
+		tx.Set("1", `{"name":{"first":"Tom","last":"Johnson"},"age":38}`, nil)
+		tx.Set("2", `{"name":{"first":"Janet","last":"Prichard"},"age":47}`, nil)
+		tx.Set("3", `{"name":{"first":"Carol","last":"Anderson"},"age":52}`, nil)
+		tx.Set("4", `{"name":{"first":"Alan","last":"Cooper"},"age":28}`, nil)
+		tx.Set("5", `{"name":{"first":"Sam","last":"Anderson"},"age":51}`, nil)
+		tx.Set("6", `{"name":{"first":"Melinda","last":"Prichard"},"age":44}`, nil)
+		return nil
+	})
+	db.View(func(tx *buntdb.Tx) error {
+		tx.Ascend("last_name_age", func(key, value string) bool {
+			fmt.Printf("%s: %s\n", key, value)
+			return true
+		})
+		return nil
+	})
+
+	// Output:
+	// 5: {"name":{"first":"Sam","last":"Anderson"},"age":51}
+	// 3: {"name":{"first":"Carol","last":"Anderson"},"age":52}
+	// 4: {"name":{"first":"Alan","last":"Cooper"},"age":28}
+	// 1: {"name":{"first":"Tom","last":"Johnson"},"age":38}
+	// 6: {"name":{"first":"Melinda","last":"Prichard"},"age":44}
+	// 2: {"name":{"first":"Janet","last":"Prichard"},"age":47}
+```
+
 
 ## Data Expiration
 Items can be automatically evicted by using the `SetOptions` object in the `Set` function to set a `TTL`.

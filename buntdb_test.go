@@ -414,6 +414,138 @@ func TestVariousTx(t *testing.T) {
 		t.Fatalf("should not be able to perform transactionso on a closed database.")
 	}
 }
+func ExampleDB_CreateIndex_jSON() {
+	db, _ := Open(":memory:")
+	db.CreateIndex("last_name", "*", IndexJSON("name.last"))
+	db.CreateIndex("age", "*", IndexJSON("age"))
+	db.Update(func(tx *Tx) error {
+		tx.Set("1", `{"name":{"first":"Tom","last":"Johnson"},"age":38}`, nil)
+		tx.Set("2", `{"name":{"first":"Janet","last":"Prichard"},"age":47}`, nil)
+		tx.Set("3", `{"name":{"first":"Carol","last":"Anderson"},"age":52}`, nil)
+		tx.Set("4", `{"name":{"first":"Alan","last":"Cooper"},"age":28}`, nil)
+		return nil
+	})
+	db.View(func(tx *Tx) error {
+		fmt.Println("Order by last name")
+		tx.Ascend("last_name", func(key, value string) bool {
+			fmt.Printf("%s: %s\n", key, value)
+			return true
+		})
+		fmt.Println("Order by age")
+		tx.Ascend("age", func(key, value string) bool {
+			fmt.Printf("%s: %s\n", key, value)
+			return true
+		})
+		fmt.Println("Order by age range 30-50")
+		tx.AscendRange("age", `{"age":30}`, `{"age":50}`, func(key, value string) bool {
+			fmt.Printf("%s: %s\n", key, value)
+			return true
+		})
+		return nil
+	})
+
+	// Output:
+	// Order by last name
+	// 3: {"name":{"first":"Carol","last":"Anderson"},"age":52}
+	// 4: {"name":{"first":"Alan","last":"Cooper"},"age":28}
+	// 1: {"name":{"first":"Tom","last":"Johnson"},"age":38}
+	// 2: {"name":{"first":"Janet","last":"Prichard"},"age":47}
+	// Order by age
+	// 4: {"name":{"first":"Alan","last":"Cooper"},"age":28}
+	// 1: {"name":{"first":"Tom","last":"Johnson"},"age":38}
+	// 2: {"name":{"first":"Janet","last":"Prichard"},"age":47}
+	// 3: {"name":{"first":"Carol","last":"Anderson"},"age":52}
+	// Order by age range 30-50
+	// 1: {"name":{"first":"Tom","last":"Johnson"},"age":38}
+	// 2: {"name":{"first":"Janet","last":"Prichard"},"age":47}
+}
+
+func ExampleDB_CreateIndex_strings() {
+	db, _ := Open(":memory:")
+	db.CreateIndex("name", "*", IndexString)
+	db.Update(func(tx *Tx) error {
+		tx.Set("1", "Tom", nil)
+		tx.Set("2", "Janet", nil)
+		tx.Set("3", "Carol", nil)
+		tx.Set("4", "Alan", nil)
+		tx.Set("5", "Sam", nil)
+		tx.Set("6", "Melinda", nil)
+		return nil
+	})
+	db.View(func(tx *Tx) error {
+		tx.Ascend("name", func(key, value string) bool {
+			fmt.Printf("%s: %s\n", key, value)
+			return true
+		})
+		return nil
+	})
+
+	// Output:
+	//4: Alan
+	//3: Carol
+	//2: Janet
+	//6: Melinda
+	//5: Sam
+	//1: Tom
+}
+
+func ExampleDB_CreateIndex_ints() {
+	db, _ := Open(":memory:")
+	db.CreateIndex("age", "*", IndexInt)
+	db.Update(func(tx *Tx) error {
+		tx.Set("1", "30", nil)
+		tx.Set("2", "51", nil)
+		tx.Set("3", "16", nil)
+		tx.Set("4", "76", nil)
+		tx.Set("5", "23", nil)
+		tx.Set("6", "43", nil)
+		return nil
+	})
+	db.View(func(tx *Tx) error {
+		tx.Ascend("age", func(key, value string) bool {
+			fmt.Printf("%s: %s\n", key, value)
+			return true
+		})
+		return nil
+	})
+
+	// Output:
+	//3: 16
+	//5: 23
+	//1: 30
+	//6: 43
+	//2: 51
+	//4: 76
+}
+func ExampleDB_CreateIndex_multipleFields() {
+	db, _ := Open(":memory:")
+	db.CreateIndex("last_name_age", "*", IndexJSON("name.last"), IndexJSON("age"))
+	db.Update(func(tx *Tx) error {
+		tx.Set("1", `{"name":{"first":"Tom","last":"Johnson"},"age":38}`, nil)
+		tx.Set("2", `{"name":{"first":"Janet","last":"Prichard"},"age":47}`, nil)
+		tx.Set("3", `{"name":{"first":"Carol","last":"Anderson"},"age":52}`, nil)
+		tx.Set("4", `{"name":{"first":"Alan","last":"Cooper"},"age":28}`, nil)
+		tx.Set("5", `{"name":{"first":"Sam","last":"Anderson"},"age":51}`, nil)
+		tx.Set("6", `{"name":{"first":"Melinda","last":"Prichard"},"age":44}`, nil)
+		return nil
+	})
+	db.View(func(tx *Tx) error {
+		tx.Ascend("last_name_age", func(key, value string) bool {
+			fmt.Printf("%s: %s\n", key, value)
+			return true
+		})
+		return nil
+	})
+
+	// Output:
+	//5: {"name":{"first":"Sam","last":"Anderson"},"age":51}
+	//3: {"name":{"first":"Carol","last":"Anderson"},"age":52}
+	//4: {"name":{"first":"Alan","last":"Cooper"},"age":28}
+	//1: {"name":{"first":"Tom","last":"Johnson"},"age":38}
+	//6: {"name":{"first":"Melinda","last":"Prichard"},"age":44}
+	//2: {"name":{"first":"Janet","last":"Prichard"},"age":47}
+}
+
 func TestNoExpiringItem(t *testing.T) {
 	item := &dbItem{key: "key", val: "val"}
 	if !item.expiresAt().Equal(maxTime) {
