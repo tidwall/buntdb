@@ -1152,8 +1152,8 @@ func (tx *Tx) Set(key, value string, opts *SetOptions) (previousValue string,
 		if _, ok := tx.rollbacks[key]; !ok {
 			tx.rollbacks[key] = prev
 		}
-		if !item.expired() {
-			previousValue, replaced = item.val, true
+		if !prev.expired() {
+			previousValue, replaced = prev.val, true
 		}
 	}
 	// For commits we simply assign the item to the map. We use this map to

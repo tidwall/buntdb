@@ -1717,6 +1717,31 @@ func TestCoverShrinkShrink(t *testing.T) {
 	}
 }
 
+func TestPreviousItem(t *testing.T) {
+	db := testOpen(t)
+	defer testClose(db)
+	err := db.Update(func(tx *Tx) error {
+		_, _, err := tx.Set("hello", "world", nil)
+		if err != nil {
+			return err
+		}
+		prev, replaced, err := tx.Set("hello", "planet", nil)
+		if err != nil {
+			return err
+		}
+		if !replaced {
+			t.Fatal("should be replaced")
+		}
+		if prev != "world" {
+			t.Fatalf("expecting '%v', got '%v'", "world", prev)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestJSONIndex(t *testing.T) {
 	db := testOpen(t)
 	defer testClose(db)
