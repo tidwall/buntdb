@@ -1,7 +1,6 @@
 package buntdb
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -230,7 +229,7 @@ func TestVariousTx(t *testing.T) {
 	if _, err := db.file.Seek(0, 2); err != nil {
 		t.Fatal(err)
 	}
-	db.bufw = bufio.NewWriter(db.file)
+	db.buf = &bytes.Buffer{}
 	if err := db.CreateIndex("blank", "*", nil); err != nil {
 		t.Fatal(err)
 	}
