@@ -52,12 +52,6 @@ var (
 	ErrShrinkInProcess = errors.New("shrink is in-process")
 )
 
-// Iterator allows callers of Ascend* or Descend* to iterate in-order
-// over portions of an index. When this function returns false, iteration
-// will stop and the associated Ascend* or Descend* function will immediately
-// return.
-type Iterator func(key, val string) bool
-
 // DB represents a collection of key-value pairs that persist on disk.
 // Transactions are used for all forms of data access to the DB.
 type DB struct {
@@ -476,8 +470,8 @@ func (db *DB) backgroundManager() {
 				}
 				aofsz := int(pos)
 				if aofsz > db.config.AutoShrinkMinSize {
-					perc := float64(db.config.AutoShrinkPercentage) / 100.0
-					shrink = aofsz > db.lastaofsz+int(float64(db.lastaofsz)*perc)
+					prc := float64(db.config.AutoShrinkPercentage) / 100.0
+					shrink = aofsz > db.lastaofsz+int(float64(db.lastaofsz)*prc)
 				}
 			}
 			// produce a list of expired items that need removing
@@ -1240,9 +1234,8 @@ func (tx *Tx) TTL(key string) (time.Duration, error) {
 // The start and stop params are the greaterThan, lessThan limits. For
 // descending order, these will be lessThan, greaterThan.
 // An error will be returned if the tx is closed or the index is not found.
-func (tx *Tx) scan(
-	desc, gt, lt bool, index, start, stop string, iterator Iterator,
-) error {
+func (tx *Tx) scan(desc, gt, lt bool, index, start, stop string,
+	iterator func(key, value string) bool) error {
 	if tx.db == nil {
 		return ErrTxClosed
 	}
@@ -1312,7 +1305,8 @@ func (tx *Tx) scan(
 // as specified by the less() function of the defined index.
 // When an index is not provided, the results will be ordered by the item key.
 // An invalid index will return an error.
-func (tx *Tx) Ascend(index string, iterator Iterator) error {
+func (tx *Tx) Ascend(index string,
+	iterator func(key, value string) bool) error {
 	return tx.scan(false, false, false, index, "", "", iterator)
 }
 
@@ -1322,9 +1316,8 @@ func (tx *Tx) Ascend(index string, iterator Iterator) error {
 // as specified by the less() function of the defined index.
 // When an index is not provided, the results will be ordered by the item key.
 // An invalid index will return an error.
-func (tx *Tx) AscendGreaterOrEqual(
-	index, pivot string, iterator Iterator,
-) error {
+func (tx *Tx) AscendGreaterOrEqual(index, pivot string,
+	iterator func(key, value string) bool) error {
 	return tx.scan(false, true, false, index, pivot, "", iterator)
 }
 
@@ -1334,7 +1327,8 @@ func (tx *Tx) AscendGreaterOrEqual(
 // as specified by the less() function of the defined index.
 // When an index is not provided, the results will be ordered by the item key.
 // An invalid index will return an error.
-func (tx *Tx) AscendLessThan(index, pivot string, iterator Iterator) error {
+func (tx *Tx) AscendLessThan(index, pivot string,
+	iterator func(key, value string) bool) error {
 	return tx.scan(false, false, true, index, pivot, "", iterator)
 }
 
@@ -1345,7 +1339,7 @@ func (tx *Tx) AscendLessThan(index, pivot string, iterator Iterator) error {
 // When an index is not provided, the results will be ordered by the item key.
 // An invalid index will return an error.
 func (tx *Tx) AscendRange(index, greaterOrEqual, lessThan string,
-	iterator Iterator) error {
+	iterator func(key, value string) bool) error {
 	return tx.scan(
 		false, true, true, index, greaterOrEqual, lessThan, iterator,
 	)
@@ -1357,7 +1351,8 @@ func (tx *Tx) AscendRange(index, greaterOrEqual, lessThan string,
 // as specified by the less() function of the defined index.
 // When an index is not provided, the results will be ordered by the item key.
 // An invalid index will return an error.
-func (tx *Tx) Descend(index string, iterator Iterator) error {
+func (tx *Tx) Descend(index string,
+	iterator func(key, value string) bool) error {
 	return tx.scan(true, false, false, index, "", "", iterator)
 }
 
@@ -1367,7 +1362,8 @@ func (tx *Tx) Descend(index string, iterator Iterator) error {
 // as specified by the less() function of the defined index.
 // When an index is not provided, the results will be ordered by the item key.
 // An invalid index will return an error.
-func (tx *Tx) DescendGreaterThan(index, pivot string, iterator Iterator) error {
+func (tx *Tx) DescendGreaterThan(index, pivot string,
+	iterator func(key, value string) bool) error {
 	return tx.scan(true, true, false, index, pivot, "", iterator)
 }
 
@@ -1377,7 +1373,8 @@ func (tx *Tx) DescendGreaterThan(index, pivot string, iterator Iterator) error {
 // as specified by the less() function of the defined index.
 // When an index is not provided, the results will be ordered by the item key.
 // An invalid index will return an error.
-func (tx *Tx) DescendLessOrEqual(index, pivot string, iterator Iterator) error {
+func (tx *Tx) DescendLessOrEqual(index, pivot string,
+	iterator func(key, value string) bool) error {
 	return tx.scan(true, false, true, index, pivot, "", iterator)
 }
 
@@ -1388,7 +1385,7 @@ func (tx *Tx) DescendLessOrEqual(index, pivot string, iterator Iterator) error {
 // When an index is not provided, the results will be ordered by the item key.
 // An invalid index will return an error.
 func (tx *Tx) DescendRange(index, lessOrEqual, greaterThan string,
-	iterator Iterator) error {
+	iterator func(key, value string) bool) error {
 	return tx.scan(
 		true, true, true, index, lessOrEqual, greaterThan, iterator,
 	)
@@ -1408,7 +1405,8 @@ func (r *rect) Rect(ctx interface{}) (min, max []float64) {
 // is represented by the rect string. This string will be processed by the
 // same bounds function that was passed to the CreateSpatialIndex() function.
 // An invalid index will return an error.
-func (tx *Tx) Intersects(index, bounds string, iterator Iterator) error {
+func (tx *Tx) Intersects(index, bounds string,
+	iterator func(key, value string) bool) error {
 	if tx.db == nil {
 		return ErrTxClosed
 	}
@@ -1615,7 +1613,5 @@ func IndexJSONCaseSensitive(path string) func(a, b string) bool {
 
 // Desc is a helper function that changes the order of an index.
 func Desc(less func(a, b string) bool) func(a, b string) bool {
-	return func(a, b string) bool {
-		return less(b, a)
-	}
+	return func(a, b string) bool { return less(b, a) }
 }
