@@ -1612,3 +1612,10 @@ func IndexJSONCaseSensitive(path string) func(a, b string) bool {
 		return gjson.Get(a, path).Less(gjson.Get(b, path), true)
 	}
 }
+
+// Desc is a helper function that changes the order of an index.
+func Desc(less func(a, b string) bool) func(a, b string) bool {
+	return func(a, b string) bool {
+		return less(b, a)
+	}
+}

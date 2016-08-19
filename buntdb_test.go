@@ -413,6 +413,35 @@ func TestVariousTx(t *testing.T) {
 		t.Fatalf("should not be able to perform transactionso on a closed database.")
 	}
 }
+func ExampleDesc() {
+	db, _ := Open(":memory:")
+	db.CreateIndex("last_name_age", "*", IndexJSON("name.last"), Desc(IndexJSON("age")))
+	db.Update(func(tx *Tx) error {
+		tx.Set("1", `{"name":{"first":"Tom","last":"Johnson"},"age":38}`, nil)
+		tx.Set("2", `{"name":{"first":"Janet","last":"Prichard"},"age":47}`, nil)
+		tx.Set("3", `{"name":{"first":"Carol","last":"Anderson"},"age":52}`, nil)
+		tx.Set("4", `{"name":{"first":"Alan","last":"Cooper"},"age":28}`, nil)
+		tx.Set("5", `{"name":{"first":"Sam","last":"Anderson"},"age":51}`, nil)
+		tx.Set("6", `{"name":{"first":"Melinda","last":"Prichard"},"age":44}`, nil)
+		return nil
+	})
+	db.View(func(tx *Tx) error {
+		tx.Ascend("last_name_age", func(key, value string) bool {
+			fmt.Printf("%s: %s\n", key, value)
+			return true
+		})
+		return nil
+	})
+
+	// Output:
+	//3: {"name":{"first":"Carol","last":"Anderson"},"age":52}
+	//5: {"name":{"first":"Sam","last":"Anderson"},"age":51}
+	//4: {"name":{"first":"Alan","last":"Cooper"},"age":28}
+	//1: {"name":{"first":"Tom","last":"Johnson"},"age":38}
+	//2: {"name":{"first":"Janet","last":"Prichard"},"age":47}
+	//6: {"name":{"first":"Melinda","last":"Prichard"},"age":44}
+}
+
 func ExampleDB_CreateIndex_jSON() {
 	db, _ := Open(":memory:")
 	db.CreateIndex("last_name", "*", IndexJSON("name.last"))

@@ -419,34 +419,44 @@ This is similar to a [multi column index](http://dev.mysql.com/doc/refman/5.7/en
 In this example we are creating a multi value index on "name.last" and "age":
 
 ```go
-	db, _ := buntdb.Open(":memory:")
-	db.CreateIndex("last_name_age", "*", buntdb.IndexJSON("name.last"), buntdb.IndexJSON("age"))
-	db.Update(func(tx *buntdb.Tx) error {
-		tx.Set("1", `{"name":{"first":"Tom","last":"Johnson"},"age":38}`, nil)
-		tx.Set("2", `{"name":{"first":"Janet","last":"Prichard"},"age":47}`, nil)
-		tx.Set("3", `{"name":{"first":"Carol","last":"Anderson"},"age":52}`, nil)
-		tx.Set("4", `{"name":{"first":"Alan","last":"Cooper"},"age":28}`, nil)
-		tx.Set("5", `{"name":{"first":"Sam","last":"Anderson"},"age":51}`, nil)
-		tx.Set("6", `{"name":{"first":"Melinda","last":"Prichard"},"age":44}`, nil)
-		return nil
+db, _ := buntdb.Open(":memory:")
+db.CreateIndex("last_name_age", "*", buntdb.IndexJSON("name.last"), buntdb.IndexJSON("age"))
+db.Update(func(tx *buntdb.Tx) error {
+	tx.Set("1", `{"name":{"first":"Tom","last":"Johnson"},"age":38}`, nil)
+	tx.Set("2", `{"name":{"first":"Janet","last":"Prichard"},"age":47}`, nil)
+	tx.Set("3", `{"name":{"first":"Carol","last":"Anderson"},"age":52}`, nil)
+	tx.Set("4", `{"name":{"first":"Alan","last":"Cooper"},"age":28}`, nil)
+	tx.Set("5", `{"name":{"first":"Sam","last":"Anderson"},"age":51}`, nil)
+	tx.Set("6", `{"name":{"first":"Melinda","last":"Prichard"},"age":44}`, nil)
+	return nil
+})
+db.View(func(tx *buntdb.Tx) error {
+	tx.Ascend("last_name_age", func(key, value string) bool {
+		fmt.Printf("%s: %s\n", key, value)
+		return true
 	})
-	db.View(func(tx *buntdb.Tx) error {
-		tx.Ascend("last_name_age", func(key, value string) bool {
-			fmt.Printf("%s: %s\n", key, value)
-			return true
-		})
-		return nil
-	})
+	return nil
+})
 
-	// Output:
-	// 5: {"name":{"first":"Sam","last":"Anderson"},"age":51}
-	// 3: {"name":{"first":"Carol","last":"Anderson"},"age":52}
-	// 4: {"name":{"first":"Alan","last":"Cooper"},"age":28}
-	// 1: {"name":{"first":"Tom","last":"Johnson"},"age":38}
-	// 6: {"name":{"first":"Melinda","last":"Prichard"},"age":44}
-	// 2: {"name":{"first":"Janet","last":"Prichard"},"age":47}
+// Output:
+// 5: {"name":{"first":"Sam","last":"Anderson"},"age":51}
+// 3: {"name":{"first":"Carol","last":"Anderson"},"age":52}
+// 4: {"name":{"first":"Alan","last":"Cooper"},"age":28}
+// 1: {"name":{"first":"Tom","last":"Johnson"},"age":38}
+// 6: {"name":{"first":"Melinda","last":"Prichard"},"age":44}
+// 2: {"name":{"first":"Janet","last":"Prichard"},"age":47}
 ```
 
+## Descending Ordered Index
+Any index can be put in descending order by wrapping it's less function with `buntdb.Desc`.
+
+```go
+db.CreateIndex("last_name_age", "*", 
+	buntdb.IndexJSON("name.last"), 
+	buntdb.Desc(buntdb.IndexJSON("age")))
+```
+
+This will create a multi value index where the last name is ascending and the age is descending.
 
 ## Data Expiration
 Items can be automatically evicted by using the `SetOptions` object in the `Set` function to set a `TTL`.
