@@ -502,6 +502,28 @@ The `Config.SyncPolicy` has the following options:
 - `EverySecond` - fsync every second, fast and safer, this is the default
 - `Always` - fsync after every write, very durable, slower
 
+## Config 
+
+Here are some configuration options that can be use to change various behaviors of the database.
+
+- **SyncPolicy** adjusts how often the data is synced to disk. This value can be Never, EverySecond, or Always. Default is EverySecond.
+- **AutoShrinkPercentage** is used by the background process to trigger a shrink of the aof file when the size of the file is larger than the percentage of the result of the previous shrunk file. For example, if this value is 100, and the last shrink process resulted in a 100mb file, then the new aof file must be 200mb before a shrink is triggered. Default is 100.
+- **AutoShrinkMinSize** defines the minimum size of the aof file before an automatic shrink can occur. Default is 32MB.
+- **AutoShrinkDisabled** turns off automatic background shrinking. Default is false.
+
+To update the configuration you should call `ReadConfig` followed by `SetConfig`. For example:
+
+```go
+
+var config buntdb.Config
+if err := db.ReadConfig(&config); err != nil{
+    log.Fatal(err)
+}
+if err := db.WriteConfig(config); err != nil{
+    log.Fatal(err)
+}
+```
+
 ## Performance
 
 How fast is BuntDB?
