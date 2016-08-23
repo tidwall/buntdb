@@ -20,13 +20,17 @@ func testOpen(t testing.TB) *DB {
 	}
 	return testReOpen(t, nil)
 }
-
 func testReOpen(t testing.TB, db *DB) *DB {
+	return testReOpenDelay(t, db, 0)
+}
+
+func testReOpenDelay(t testing.TB, db *DB, dur time.Duration) *DB {
 	if db != nil {
 		if err := db.Close(); err != nil {
 			t.Fatal(err)
 		}
 	}
+	time.Sleep(dur)
 	db, err := Open("data.db")
 	if err != nil {
 		t.Fatal(err)
@@ -1349,6 +1353,50 @@ func TestRectStrings(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := testRectStringer([]float64{1, 2, 3, 4, 5}, []float64{6, 7, 8, 9, 0}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestTTLReOpen test setting a TTL and then immediatelly closing the database and
+// then waiting the TTL before reopening. The key should not be accessible.
+func TestTTLReOpen(t *testing.T) {
+	ttl := time.Second * 3
+	db := testOpen(t)
+	defer testClose(db)
+	err := db.Update(func(tx *Tx) error {
+		if _, _, err := tx.Set("key1", "val1", &SetOptions{Expires: true, TTL: ttl}); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	db = testReOpenDelay(t, db, ttl/4)
+	err = db.View(func(tx *Tx) error {
+		val, err := tx.Get("key1")
+		if err != nil {
+			return err
+		}
+		if val != "val1" {
+			t.Fatalf("expecting '%v', got '%v'", "val1", val)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	db = testReOpenDelay(t, db, ttl-ttl/4)
+	defer testClose(db)
+	err = db.View(func(tx *Tx) error {
+		val, err := tx.Get("key1")
+		if err == nil || err != ErrNotFound || val != "" {
+			t.Fatal("expecting not found")
+		}
+
+		return nil
+	})
+	if err != nil {
 		t.Fatal(err)
 	}
 }

@@ -160,6 +160,7 @@ func (db *DB) Close() error {
 	}
 	db.closed = true
 	if db.persist {
+		db.file.Sync() // do a sync but ignore the error
 		if err := db.file.Close(); err != nil {
 			return err
 		}
@@ -657,6 +658,11 @@ var errValidEOF = errors.New("valid eof")
 // http://redis.io/topics/protocol. The only supported RESP commands are DEL and
 // SET.
 func (db *DB) load() error {
+	fi, err := db.file.Stat()
+	if err != nil {
+		return err
+	}
+	modTime := fi.ModTime()
 	data := make([]byte, 4096)
 	parts := make([]string, 0, 8)
 	r := bufio.NewReader(db.file)
@@ -764,15 +770,18 @@ func (db *DB) load() error {
 				if err != nil {
 					return err
 				}
-				dur := time.Duration(ex) * time.Second
-				db.insertIntoDatabase(&dbItem{
-					key: parts[1],
-					val: parts[2],
-					opts: &dbItemOpts{
-						ex:   true,
-						exat: time.Now().Add(dur),
-					},
-				})
+				now := time.Now()
+				dur := (time.Duration(ex) * time.Second) - now.Sub(modTime)
+				if dur > 0 {
+					db.insertIntoDatabase(&dbItem{
+						key: parts[1],
+						val: parts[2],
+						opts: &dbItemOpts{
+							ex:   true,
+							exat: now.Add(dur),
+						},
+					})
+				}
 			} else {
 				db.insertIntoDatabase(&dbItem{key: parts[1], val: parts[2]})
 			}
