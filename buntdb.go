@@ -739,7 +739,7 @@ func (db *DB) load() error {
 				return ErrInvalid
 			}
 			// copy string
-			parts = append(parts, string(append([]byte{}, data[:n]...)))
+			parts = append(parts, string(data[:n]))
 		}
 		// finished reading the command
 
