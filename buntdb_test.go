@@ -89,6 +89,62 @@ func TestBackgroudOperations(t *testing.T) {
 		t.Fatalf("expecting '%v', got '%v'", 200, n)
 	}
 }
+func TestSaveLoad(t *testing.T) {
+	db, _ := Open(":memory:")
+	defer db.Close()
+	if err := db.Update(func(tx *Tx) error {
+		for i := 0; i < 20; i++ {
+			_, _, err := tx.Set(fmt.Sprintf("key:%d", i), fmt.Sprintf("planet:%d", i), nil)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.Create("temp.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		f.Close()
+		os.RemoveAll("temp.db")
+	}()
+	if err := db.Save(f); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	db, _ = Open(":memory:")
+	defer db.Close()
+	f, err = os.Open("temp.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if err := db.Load(f); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.View(func(tx *Tx) error {
+		for i := 0; i < 20; i++ {
+			ex := fmt.Sprintf("planet:%d", i)
+			val, err := tx.Get(fmt.Sprintf("key:%d", i))
+			if err != nil {
+				return err
+			}
+			if ex != val {
+				t.Fatalf("expected %s, got %s", ex, val)
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestVariousTx(t *testing.T) {
 	db := testOpen(t)
 	defer testClose(db)
