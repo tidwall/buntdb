@@ -237,7 +237,9 @@ type index struct {
 // An error will occur if an index with the same name already exists.
 //
 // When a pattern is provided, the index will be populated with
-// keys that match the specified pattern.
+// keys that match the specified pattern. This is a very simple pattern
+// match where '*' matches on any number characters and '?' matches on
+// any one character.
 // The less function compares if string 'a' is less than string 'b'.
 // It allows for indexes to create custom ordering. It's possible
 // that the strings may be textual or binary. It's up to the provided
@@ -1346,6 +1348,79 @@ func (tx *Tx) scan(desc, gt, lt bool, index, start, stop string,
 		}
 	}
 	return nil
+}
+
+// Match returns true if the specified key matches the pattern. This is a very
+// simple pattern matcher where '*' matches on any number characters and '?'
+// matches on any one character.
+func Match(key, pattern string) bool {
+	return match.Match(key, pattern)
+}
+
+// AscendKeys allows for iterating through keys based on the specified pattern.
+func (tx *Tx) AscendKeys(pattern string,
+	iterator func(key, value string) bool) error {
+	if pattern == "" {
+		return nil
+	}
+	if pattern[0] == '*' {
+		if pattern == "*" {
+			return tx.Ascend("", iterator)
+		}
+		return tx.Ascend("", func(key, value string) bool {
+			if match.Match(key, pattern) {
+				if !iterator(key, value) {
+					return false
+				}
+			}
+			return true
+		})
+	}
+	min, max := match.Allowable(pattern)
+	return tx.AscendGreaterOrEqual("", min, func(key, value string) bool {
+		if key > max {
+			return false
+		}
+		if match.Match(key, pattern) {
+			if !iterator(key, value) {
+				return false
+			}
+		}
+		return true
+	})
+}
+
+// DescendKeys allows for iterating through keys based on the specified pattern.
+func (tx *Tx) DescendKeys(pattern string,
+	iterator func(key, value string) bool) error {
+	if pattern == "" {
+		return nil
+	}
+	if pattern[0] == '*' {
+		if pattern == "*" {
+			return tx.Descend("", iterator)
+		}
+		return tx.Descend("", func(key, value string) bool {
+			if match.Match(key, pattern) {
+				if !iterator(key, value) {
+					return false
+				}
+			}
+			return true
+		})
+	}
+	min, max := match.Allowable(pattern)
+	return tx.DescendLessOrEqual("", max, func(key, value string) bool {
+		if key < min {
+			return false
+		}
+		if match.Match(key, pattern) {
+			if !iterator(key, value) {
+				return false
+			}
+		}
+		return true
+	})
 }
 
 // Ascend calls the iterator for every item in the database within the range

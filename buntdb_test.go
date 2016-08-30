@@ -473,6 +473,68 @@ func TestVariousTx(t *testing.T) {
 		t.Fatalf("should not be able to perform transactionso on a closed database.")
 	}
 }
+
+func ExampleDescKeys() {
+	db, _ := Open(":memory:")
+	db.CreateIndex("name", "*", IndexString)
+	db.Update(func(tx *Tx) error {
+		tx.Set("user:100:first", "Tom", nil)
+		tx.Set("user:100:last", "Johnson", nil)
+		tx.Set("user:101:first", "Janet", nil)
+		tx.Set("user:101:last", "Prichard", nil)
+		tx.Set("user:102:first", "Alan", nil)
+		tx.Set("user:102:last", "Cooper", nil)
+		return nil
+	})
+	db.View(func(tx *Tx) error {
+		tx.AscendKeys("user:101:*",
+			func(key, value string) bool {
+				fmt.Printf("%s: %s\n", key, value)
+				return true
+			})
+		tx.AscendKeys("user:10?:*",
+			func(key, value string) bool {
+				fmt.Printf("%s: %s\n", key, value)
+				return true
+			})
+		tx.AscendKeys("*2*",
+			func(key, value string) bool {
+				fmt.Printf("%s: %s\n", key, value)
+				return true
+			})
+		tx.DescendKeys("user:101:*",
+			func(key, value string) bool {
+				fmt.Printf("%s: %s\n", key, value)
+				return true
+			})
+		tx.DescendKeys("*",
+			func(key, value string) bool {
+				fmt.Printf("%s: %s\n", key, value)
+				return true
+			})
+		return nil
+	})
+	// Output:
+	//user:101:first: Janet
+	//user:101:last: Prichard
+	//user:100:first: Tom
+	//user:100:last: Johnson
+	//user:101:first: Janet
+	//user:101:last: Prichard
+	//user:102:first: Alan
+	//user:102:last: Cooper
+	//user:102:first: Alan
+	//user:102:last: Cooper
+	//user:101:last: Prichard
+	//user:101:first: Janet
+	//user:102:last: Cooper
+	//user:102:first: Alan
+	//user:101:last: Prichard
+	//user:101:first: Janet
+	//user:100:last: Johnson
+	//user:100:first: Tom
+}
+
 func ExampleDesc() {
 	db, _ := Open(":memory:")
 	db.CreateIndex("last_name_age", "*", IndexJSON("name.last"), Desc(IndexJSON("age")))
