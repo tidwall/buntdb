@@ -18,6 +18,7 @@ import (
 
 	"github.com/tidwall/btree"
 	"github.com/tidwall/gjson"
+	"github.com/tidwall/match"
 	"github.com/tidwall/rtree"
 )
 
@@ -326,7 +327,7 @@ func (db *DB) createIndex(
 
 	db.keys.Ascend(func(item btree.Item) bool {
 		dbi := item.(*dbItem)
-		if !wildcardMatch(dbi.key, idx.pattern, idx.uc) {
+		if !match.Match(dbi.key, idx.pattern) {
 			return true
 		}
 		if less != nil {
@@ -339,67 +340,6 @@ func (db *DB) createIndex(
 	})
 	db.idxs[name] = idx
 	return nil
-}
-
-// wilcardMatch returns true if str matches pattern. This is a very
-// simple wildcard match where '*' matches on any number characters
-// and '?' matches on any one character.
-func wildcardMatch(str, pattern string, uc bool) bool {
-	if pattern == "*" {
-		return true
-	}
-	if !uc {
-		return deepMatch(str, pattern)
-	}
-	rstr := make([]rune, 0, len(str))
-	rpattern := make([]rune, 0, len(pattern))
-	for _, r := range str {
-		rstr = append(rstr, r)
-	}
-	for _, r := range pattern {
-		rpattern = append(rpattern, r)
-	}
-	return deepMatchRune(rstr, rpattern)
-}
-func deepMatch(str, pattern string) bool {
-	for len(pattern) > 0 {
-		switch pattern[0] {
-		default:
-			if len(str) == 0 || str[0] != pattern[0] {
-				return false
-			}
-		case '?':
-			if len(str) == 0 {
-				return false
-			}
-		case '*':
-			return deepMatch(str, pattern[1:]) ||
-				(len(str) > 0 && deepMatch(str[1:], pattern))
-		}
-		str = str[1:]
-		pattern = pattern[1:]
-	}
-	return len(str) == 0 && len(pattern) == 0
-}
-func deepMatchRune(str, pattern []rune) bool {
-	for len(pattern) > 0 {
-		switch pattern[0] {
-		default:
-			if len(str) == 0 || str[0] != pattern[0] {
-				return false
-			}
-		case '?':
-			if len(str) == 0 {
-				return false
-			}
-		case '*':
-			return deepMatchRune(str, pattern[1:]) ||
-				(len(str) > 0 && deepMatchRune(str[1:], pattern))
-		}
-		str = str[1:]
-		pattern = pattern[1:]
-	}
-	return len(str) == 0 && len(pattern) == 0
 }
 
 // DropIndex removes an index.
@@ -492,7 +432,7 @@ func (db *DB) insertIntoDatabase(item *dbItem) *dbItem {
 		db.exps.ReplaceOrInsert(item)
 	}
 	for _, idx := range db.idxs {
-		if !wildcardMatch(item.key, idx.pattern, idx.uc) {
+		if !match.Match(item.key, idx.pattern) {
 			continue
 		}
 		if idx.btr != nil {

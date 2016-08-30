@@ -1107,66 +1107,6 @@ func test(t *testing.T, a, b bool) {
 	}
 }
 
-func TestMatch(t *testing.T) {
-	if !wildcardMatch("hello world", "hello world", false) {
-		t.Fatal("fail")
-	}
-	if wildcardMatch("hello world", "jello world", false) {
-		t.Fatal("fail")
-	}
-	if !wildcardMatch("hello world", "hello*", false) {
-		t.Fatal("fail")
-	}
-	if wildcardMatch("hello world", "jello*", false) {
-		t.Fatal("fail")
-	}
-	if !wildcardMatch("hello world", "hello?world", false) {
-		t.Fatal("fail")
-	}
-	if wildcardMatch("hello world", "jello?world", false) {
-		t.Fatal("fail")
-	}
-	if !wildcardMatch("hello world", "he*o?world", false) {
-		t.Fatal("fail")
-	}
-	if !wildcardMatch("hello world", "he*o?wor*", false) {
-		t.Fatal("fail")
-	}
-	if !wildcardMatch("hello world", "he*o?*r*", false) {
-		t.Fatal("fail")
-	}
-	if !wildcardMatch("的情况下解析一个", "*", true) {
-		t.Fatal("fail")
-	}
-	if !wildcardMatch("的情况下解析一个", "*况下*", true) {
-		t.Fatal("fail")
-	}
-	if !wildcardMatch("的情况下解析一个", "*况?*", true) {
-		t.Fatal("fail")
-	}
-	if !wildcardMatch("的情况下解析一个", "的情况?解析一个", true) {
-		t.Fatal("fail")
-	}
-}
-
-func TestPatternMatching(t *testing.T) {
-	test(t, wildcardMatch("hello", "hello", false), true)
-	test(t, wildcardMatch("hello", "h*", false), true)
-	test(t, wildcardMatch("hello", "h*o", false), true)
-	test(t, wildcardMatch("hello", "h*l*o", false), true)
-	test(t, wildcardMatch("hello", "h*z*o", false), false)
-	test(t, wildcardMatch("hello", "*l*o", false), true)
-	test(t, wildcardMatch("hello", "*l*", false), true)
-	test(t, wildcardMatch("hello", "*?*", false), true)
-	test(t, wildcardMatch("hello", "*", false), true)
-	test(t, wildcardMatch("hello", "h?llo", false), true)
-	test(t, wildcardMatch("hello", "h?l?o", false), true)
-	test(t, wildcardMatch("", "*", false), true)
-	test(t, wildcardMatch("", "", false), true)
-	test(t, wildcardMatch("h", "", false), false)
-	test(t, wildcardMatch("", "?", false), false)
-}
-
 func TestBasic(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
 	db := testOpen(t)
