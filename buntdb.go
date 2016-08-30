@@ -224,6 +224,7 @@ type index struct {
 	rtr     *rtree.RTree                           // contains the items
 	name    string                                 // name of the index
 	pattern string                                 // a required key pattern
+	uc      bool                                   // unicode pattern
 	less    func(a, b string) bool                 // less comparison function
 	rect    func(item string) (min, max []float64) // rect from string function
 	db      *DB                                    // the origin database
@@ -310,6 +311,12 @@ func (db *DB) createIndex(
 		rect:    rect,
 		db:      db,
 	}
+	for i := 0; i < len(pattern); i++ {
+		if pattern[i] > 0x7f {
+			idx.uc = true
+			break
+		}
+	}
 	if less != nil {
 		idx.btr = btree.New(btreeDegrees, idx)
 	}
@@ -319,7 +326,7 @@ func (db *DB) createIndex(
 
 	db.keys.Ascend(func(item btree.Item) bool {
 		dbi := item.(*dbItem)
-		if !wildcardMatch(dbi.key, idx.pattern) {
+		if !wildcardMatch(dbi.key, idx.pattern, idx.uc) {
 			return true
 		}
 		if less != nil {
@@ -337,11 +344,22 @@ func (db *DB) createIndex(
 // wilcardMatch returns true if str matches pattern. This is a very
 // simple wildcard match where '*' matches on any number characters
 // and '?' matches on any one character.
-func wildcardMatch(str, pattern string) bool {
+func wildcardMatch(str, pattern string, uc bool) bool {
 	if pattern == "*" {
 		return true
 	}
-	return deepMatch(str, pattern)
+	if !uc {
+		return deepMatch(str, pattern)
+	}
+	rstr := make([]rune, 0, len(str))
+	rpattern := make([]rune, 0, len(pattern))
+	for _, r := range str {
+		rstr = append(rstr, r)
+	}
+	for _, r := range pattern {
+		rpattern = append(rpattern, r)
+	}
+	return deepMatchRune(rstr, rpattern)
 }
 func deepMatch(str, pattern string) bool {
 	for len(pattern) > 0 {
@@ -355,8 +373,28 @@ func deepMatch(str, pattern string) bool {
 				return false
 			}
 		case '*':
-			return wildcardMatch(str, pattern[1:]) ||
-				(len(str) > 0 && wildcardMatch(str[1:], pattern))
+			return deepMatch(str, pattern[1:]) ||
+				(len(str) > 0 && deepMatch(str[1:], pattern))
+		}
+		str = str[1:]
+		pattern = pattern[1:]
+	}
+	return len(str) == 0 && len(pattern) == 0
+}
+func deepMatchRune(str, pattern []rune) bool {
+	for len(pattern) > 0 {
+		switch pattern[0] {
+		default:
+			if len(str) == 0 || str[0] != pattern[0] {
+				return false
+			}
+		case '?':
+			if len(str) == 0 {
+				return false
+			}
+		case '*':
+			return deepMatchRune(str, pattern[1:]) ||
+				(len(str) > 0 && deepMatchRune(str[1:], pattern))
 		}
 		str = str[1:]
 		pattern = pattern[1:]
@@ -454,7 +492,7 @@ func (db *DB) insertIntoDatabase(item *dbItem) *dbItem {
 		db.exps.ReplaceOrInsert(item)
 	}
 	for _, idx := range db.idxs {
-		if !wildcardMatch(item.key, idx.pattern) {
+		if !wildcardMatch(item.key, idx.pattern, idx.uc) {
 			continue
 		}
 		if idx.btr != nil {
