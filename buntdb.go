@@ -55,6 +55,9 @@ var (
 	// ErrPersistenceActive is returned when post-loading data from an database
 	// not opened with Open(":memory:").
 	ErrPersistenceActive = errors.New("persistence active")
+
+	// ErrTxIterating is returned when Set or Delete are called while iterating.
+	ErrTxIterating = errors.New("tx is iterating")
 )
 
 // DB represents a collection of key-value pairs that persist on disk.
@@ -928,6 +931,7 @@ type Tx struct {
 	funcd     bool               // when true Commit and Rollback panic.
 	rollbacks map[string]*dbItem // cotnains details for rolling back tx.
 	commits   map[string]*dbItem // contains details for committing tx.
+	itercount int                // stack of iterators
 }
 
 // begin opens a new transaction.
@@ -1183,12 +1187,17 @@ type SetOptions struct {
 // value will be returned through the previousValue variable.
 // The results of this operation will not be available to other
 // transactions until the current transaction has successfully committed.
+//
+// Only a writable transaction can be used with this operation.
+// This operation is not allowed during iterations such as Ascend* & Descend*.
 func (tx *Tx) Set(key, value string, opts *SetOptions) (previousValue string,
 	replaced bool, err error) {
 	if tx.db == nil {
 		return "", false, ErrTxClosed
 	} else if !tx.writable {
 		return "", false, ErrTxNotWritable
+	} else if tx.itercount > 0 {
+		return "", false, ErrTxIterating
 	}
 	item := &dbItem{key: key, val: value}
 	if opts != nil {
@@ -1243,12 +1252,15 @@ func (tx *Tx) Get(key string) (val string, err error) {
 // Delete removes an item from the database based on the item's key. If the item
 // does not exist or if the item has expired then ErrNotFound is returned.
 //
-// Only writable transaction can be used for Delete() calls.
+// Only a writable transaction can be used for this operation.
+// This operation is not allowed during iterations such as Ascend* & Descend*.
 func (tx *Tx) Delete(key string) (val string, err error) {
 	if tx.db == nil {
 		return "", ErrTxClosed
 	} else if !tx.writable {
 		return "", ErrTxNotWritable
+	} else if tx.itercount > 0 {
+		return "", ErrTxIterating
 	}
 	item := tx.db.deleteFromDatabase(&dbItem{key: key})
 	if item == nil {
@@ -1337,6 +1349,10 @@ func (tx *Tx) scan(desc, gt, lt bool, index, start, stop string,
 		}
 	}
 	// execute the scan on the underlying tree.
+	tx.itercount++
+	defer func() {
+		tx.itercount--
+	}()
 	if desc {
 		if gt {
 			if lt {

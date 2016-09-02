@@ -144,7 +144,46 @@ func TestSaveLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+func TestMutatingIterator(t *testing.T) {
+	db := testOpen(t)
+	defer testClose(db)
+	count := 1000
+	if err := db.CreateIndex("ages", "user:*:age", IndexInt); err != nil {
+		t.Fatal(err)
+	}
 
+	for i := 0; i < 10; i++ {
+		if err := db.Update(func(tx *Tx) error {
+			for j := 0; j < count; j++ {
+				key := fmt.Sprintf("user:%d:age", j)
+				val := fmt.Sprintf("%d", rand.Intn(100))
+				if _, _, err := tx.Set(key, val, nil); err != nil {
+					return err
+				}
+			}
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := db.Update(func(tx *Tx) error {
+			return tx.Ascend("ages", func(key, val string) bool {
+				_, err := tx.Delete(key)
+				if err != ErrTxIterating {
+					t.Fatal("should not be able to call Delete while iterating.")
+				}
+				_, _, err = tx.Set(key, "", nil)
+				if err != ErrTxIterating {
+					t.Fatal("should not be able to call Set while iterating.")
+				}
+				return true
+			})
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+	}
+}
 func TestVariousTx(t *testing.T) {
 	db := testOpen(t)
 	defer testClose(db)
