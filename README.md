@@ -38,7 +38,7 @@ Features
 - Flexible [iteration](#iterating) of data; ascending, descending, and ranges
 - [Durable append-only file](#append-only-file) format for persistence. 
 - Option to evict old items with an [expiration](#data-expiration) TTL
-- Tight codebase, ~1K loc using the `cloc` command
+- Tight codebase, under 2K loc using the `cloc` command
 - ACID semantics with locking [transactions](#transactions) that support rollbacks
 
 Getting Started

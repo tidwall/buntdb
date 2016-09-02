@@ -225,7 +225,6 @@ type index struct {
 	rtr     *rtree.RTree                           // contains the items
 	name    string                                 // name of the index
 	pattern string                                 // a required key pattern
-	uc      bool                                   // unicode pattern
 	less    func(a, b string) bool                 // less comparison function
 	rect    func(item string) (min, max []float64) // rect from string function
 	db      *DB                                    // the origin database
@@ -248,7 +247,16 @@ type index struct {
 // IndexString, IndexBinary, etc.
 func (db *DB) CreateIndex(name, pattern string,
 	less ...func(a, b string) bool) error {
-	return db.createIndex(name, pattern, less, nil)
+	return db.createIndex(false, name, pattern, less, nil)
+}
+
+// ReplaceIndex builds a new index and populates it with items.
+// The items are ordered in an b-tree and can be retrieved using the
+// Ascend* and Descend* methods.
+// If a previous index with the same name exists, that index will be deleted.
+func (db *DB) ReplaceIndex(name, pattern string,
+	less ...func(a, b string) bool) error {
+	return db.createIndex(true, name, pattern, less, nil)
 }
 
 // CreateSpatialIndex builds a new index and populates it with items.
@@ -267,11 +275,21 @@ func (db *DB) CreateIndex(name, pattern string,
 // parameter.
 func (db *DB) CreateSpatialIndex(name, pattern string,
 	rect func(item string) (min, max []float64)) error {
-	return db.createIndex(name, pattern, nil, rect)
+	return db.createIndex(false, name, pattern, nil, rect)
+}
+
+// ReplaceSpatialIndex builds a new index and populates it with items.
+// The items are organized in an r-tree and can be retrieved using the
+// Intersects method.
+// If a previous index with the same name exists, that index will be deleted.
+func (db *DB) ReplaceSpatialIndex(name, pattern string,
+	rect func(item string) (min, max []float64)) error {
+	return db.createIndex(true, name, pattern, nil, rect)
 }
 
 // createIndex is called by CreateIndex() and CreateSpatialIndex()
 func (db *DB) createIndex(
+	replace bool,
 	name string,
 	pattern string,
 	lessers []func(a, b string) bool,
@@ -286,7 +304,11 @@ func (db *DB) createIndex(
 		return ErrIndexExists
 	}
 	if _, ok := db.idxs[name]; ok {
-		return ErrIndexExists
+		if replace {
+			delete(db.idxs, name)
+		} else {
+			return ErrIndexExists
+		}
 	}
 	var less func(a, b string) bool
 	switch len(lessers) {
@@ -314,19 +336,12 @@ func (db *DB) createIndex(
 		rect:    rect,
 		db:      db,
 	}
-	for i := 0; i < len(pattern); i++ {
-		if pattern[i] > 0x7f {
-			idx.uc = true
-			break
-		}
-	}
 	if less != nil {
 		idx.btr = btree.New(btreeDegrees, idx)
 	}
 	if rect != nil {
 		idx.rtr = rtree.New(idx)
 	}
-
 	db.keys.Ascend(func(item btree.Item) bool {
 		dbi := item.(*dbItem)
 		if !match.Match(dbi.key, idx.pattern) {
