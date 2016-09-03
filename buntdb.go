@@ -131,24 +131,30 @@ const btreeDegrees = 64
 // If the file does not exist then it will be created automatically.
 func Open(path string) (*DB, error) {
 	db := &DB{}
+	// initialize trees and indexes
 	db.keys = btree.New(btreeDegrees, nil)
 	db.exps = btree.New(btreeDegrees, &exctx{db})
 	db.idxs = make(map[string]*index)
+	// initialize reusable blank buffer
 	db.buf = &bytes.Buffer{}
+	// initialize default configuration
 	db.config = Config{
 		SyncPolicy:           EverySecond,
 		AutoShrinkPercentage: 100,
 		AutoShrinkMinSize:    32 * 1024 * 1024,
 	}
+	// turn off persistence for pure in-memory
 	db.persist = path != ":memory:"
 	if db.persist {
 		var err error
-		// Hardcoding 0666 as the default mode.
+		// hardcoding 0666 as the default mode.
 		db.file, err = os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0666)
 		if err != nil {
 			return nil, err
 		}
+		// load the database from disk
 		if err := db.load(); err != nil {
+			// close on error, ignore close error
 			_ = db.file.Close()
 			return nil, err
 		}
@@ -180,28 +186,32 @@ func (db *DB) Close() error {
 }
 
 // Save writes a snapshot of the database to a writer. This operation blocks all
-// writes, but not reads.
+// writes, but not reads. This can be used for snapshots and backups for pure
+// in-memory databases using the ":memory:". Database that persist to disk
+// can be snapshotted by simply copying the database file.
 func (db *DB) Save(wr io.Writer) error {
 	var err error
 	db.mu.RLock()
 	defer db.mu.RUnlock()
+	// use a buffered writer and flush every 4MB
 	w := bufio.NewWriter(wr)
-	db.keys.Ascend(
-		func(item btree.Item) bool {
-			dbi := item.(*dbItem)
-			dbi.writeSetTo(w)
-			if w.Buffered() > 1024*20 { // 20MB buffer
-				err = w.Flush()
-				if err != nil {
-					return false
-				}
+	// iterated through every item in the database and write to the buffer
+	db.keys.Ascend(func(item btree.Item) bool {
+		dbi := item.(*dbItem)
+		dbi.writeSetTo(w)
+		if w.Buffered() > 1024*1024*4 {
+			// flush when buffer is over 4MB
+			err = w.Flush()
+			if err != nil {
+				return false
 			}
-			return true
-		},
-	)
+		}
+		return true
+	})
 	if err != nil {
 		return err
 	}
+	// one final flush
 	err = w.Flush()
 	if err != nil {
 		return err
@@ -216,6 +226,7 @@ func (db *DB) Load(rd io.Reader) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	if db.persist {
+		// cannot load into databases that persist to disk
 		return ErrPersistenceActive
 	}
 	return db.readLoad(rd, time.Now())
@@ -234,7 +245,9 @@ type index struct {
 }
 
 // clearCopy creates a copy of the index, but with an empty dataset.
+// This is used with the DeleteAll command.
 func (idx *index) clearCopy() *index {
+	// copy the index meta information
 	nidx := &index{
 		name:    idx.name,
 		pattern: idx.pattern,
@@ -242,6 +255,7 @@ func (idx *index) clearCopy() *index {
 		less:    idx.less,
 		rect:    idx.rect,
 	}
+	// initialize with empty trees
 	if nidx.less != nil {
 		nidx.btr = btree.New(btreeDegrees, nidx)
 	}
@@ -309,10 +323,7 @@ func (db *DB) ReplaceSpatialIndex(name, pattern string,
 }
 
 // createIndex is called by CreateIndex() and CreateSpatialIndex()
-func (db *DB) createIndex(
-	replace bool,
-	name string,
-	pattern string,
+func (db *DB) createIndex(replace bool, name string, pattern string,
 	lessers []func(a, b string) bool,
 	rect func(item string) (min, max []float64),
 ) error {
@@ -322,18 +333,26 @@ func (db *DB) createIndex(
 		return ErrDatabaseClosed
 	}
 	if name == "" {
+		// cannot create an index without a name.
+		// an empty name index is designated for the main "keys" tree.
 		return ErrIndexExists
 	}
+	// check if an index with that name already exists.
 	if _, ok := db.idxs[name]; ok {
 		if replace {
+			// the "replace" param is specified, simply delete the old index.
 			delete(db.idxs, name)
 		} else {
+			// index with name already exists. error.
 			return ErrIndexExists
 		}
 	}
+	// genreate a less function
 	var less func(a, b string) bool
 	switch len(lessers) {
 	default:
+		// multiple less functions specified.
+		// create a compound less function.
 		less = func(a, b string) bool {
 			for i := 0; i < len(lessers)-1; i++ {
 				if lessers[i](a, b) {
@@ -346,10 +365,11 @@ func (db *DB) createIndex(
 			return lessers[len(lessers)-1](a, b)
 		}
 	case 0:
-		less = func(a, b string) bool { return false }
+		// no less function
 	case 1:
 		less = lessers[0]
 	}
+	// intialize new index
 	idx := &index{
 		name:    name,
 		pattern: pattern,
@@ -357,15 +377,18 @@ func (db *DB) createIndex(
 		rect:    rect,
 		db:      db,
 	}
+	// initialize trees
 	if less != nil {
 		idx.btr = btree.New(btreeDegrees, idx)
 	}
 	if rect != nil {
 		idx.rtr = rtree.New(idx)
 	}
+	// iterate through all keys and fill the index
 	db.keys.Ascend(func(item btree.Item) bool {
 		dbi := item.(*dbItem)
-		if !match.Match(dbi.key, idx.pattern) {
+		if idx.pattern != "*" && !match.Match(dbi.key, idx.pattern) {
+			// does not match the pattern, conintue
 			return true
 		}
 		if less != nil {
@@ -376,6 +399,7 @@ func (db *DB) createIndex(
 		}
 		return true
 	})
+	// save the index
 	db.idxs[name] = idx
 	return nil
 }
@@ -388,11 +412,14 @@ func (db *DB) DropIndex(name string) error {
 		return ErrDatabaseClosed
 	}
 	if name == "" {
+		// cannot drop the default "keys" index
 		return ErrInvalidOperation
 	}
 	if _, ok := db.idxs[name]; !ok {
 		return ErrNotFound
 	}
+	// delete from the map.
+	// this is all that is needed to delete an index.
 	delete(db.idxs, name)
 	return nil
 }
@@ -963,7 +990,7 @@ type txWriteContext struct {
 	itercount int                // stack of iterators
 }
 
-// DeleteAll deletes all items from the database.
+// ClearAll deletes all items from the database.
 func (tx *Tx) DeleteAll() error {
 	if tx.db == nil {
 		return ErrTxClosed
