@@ -344,32 +344,6 @@ Which will return:
 [4 8 3]
 [4 7 4]
 ```
-## Collate i18n Indexes
-
-Using the external [collate package](https://github.com/tidwall/collate) it's possible to create
-indexes that are sorted by the specified langauge. This is similar to the [SQL COLLATE keyword](https://msdn.microsoft.com/en-us/library/ms174596.aspx) found in traditional databases.
-
-To install:
-
-```
-go get -u github.com/tidwall/collate
-```
-
-
-For example:
-
-```go
-import "github.com/tidwall/collate"
-
-// To sort case-insensitive in French.
-db.CreateIndex("name", "*", collate.Index("FRENCH_CI"))
-
-// To specify that numbers should sort numerically ("2" < "12") 
-// and use a comma to represent a decimal point.
-db.CreateIndex("amount", "*", collate.Index("FRENCH_NUM")) 
-```
-
-Check out the [collate project](https://github.com/tidwall/collate) for more information.
 
 ## JSON Indexes
 Indexes can be created on individual fields inside JSON documents. BuntDB uses [GJSON](https://github.com/tidwall/gjson) under the hood.
@@ -436,6 +410,7 @@ Order by age range 30-50
 1: {"name":{"first":"Tom","last":"Johnson"},"age":38}
 2: {"name":{"first":"Janet","last":"Prichard"},"age":47}
 ```
+
 ## Multi Value Index
 With BuntDB it's possible to join multiple values on a single index. 
 This is similar to a [multi column index](http://dev.mysql.com/doc/refman/5.7/en/multiple-column-indexes.html) in a traditional SQL database.
@@ -481,6 +456,38 @@ db.CreateIndex("last_name_age", "*",
 ```
 
 This will create a multi value index where the last name is ascending and the age is descending.
+
+## Collate i18n Indexes
+
+Using the external [collate package](https://github.com/tidwall/collate) it's possible to create
+indexes that are sorted by the specified langauge. This is similar to the [SQL COLLATE keyword](https://msdn.microsoft.com/en-us/library/ms174596.aspx) found in traditional databases.
+
+To install:
+
+```
+go get -u github.com/tidwall/collate
+```
+
+For example:
+
+```go
+import "github.com/tidwall/collate"
+
+// To sort case-insensitive in French.
+db.CreateIndex("name", "*", collate.IndexString("FRENCH_CI"))
+
+// To specify that numbers should sort numerically ("2" < "12") 
+// and use a comma to represent a decimal point.
+db.CreateIndex("amount", "*", collate.IndexString("FRENCH_NUM")) 
+```
+
+There's also support for Collation on JSON indexes:
+
+```go
+db.CreateIndex("last_name", "*", collate.IndexJSON("CHINESE_CI", "name.last"))
+```
+
+Check out the [collate project](https://github.com/tidwall/collate) for more information.
 
 ## Data Expiration
 Items can be automatically evicted by using the `SetOptions` object in the `Set` function to set a `TTL`.
