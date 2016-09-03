@@ -245,6 +245,47 @@ func TestDeleteAll(t *testing.T) {
 	if res2 != "bb:11\naa:22\n" {
 		t.Fatal("fail")
 	}
+	db.Update(func(tx *Tx) error {
+		tx.Set("1", "1", nil)
+		tx.Set("2", "2", nil)
+		tx.Set("3", "3", nil)
+		tx.Set("4", "4", nil)
+		return nil
+	})
+	err := db.Update(func(tx *Tx) error {
+		tx.Set("1", "a", nil)
+		tx.Set("5", "5", nil)
+		tx.Delete("2")
+		tx.Set("6", "6", nil)
+		tx.DeleteAll()
+		tx.Set("7", "7", nil)
+		tx.Set("8", "8", nil)
+		tx.Set("6", "c", nil)
+		return errors.New("please rollback")
+	})
+	if err == nil || err.Error() != "please rollback" {
+		t.Fatal("expecteding 'please rollback' error")
+	}
+
+	res = ""
+	res2 = ""
+	db.View(func(tx *Tx) error {
+		tx.Ascend("", func(key, val string) bool {
+			res += key + ":" + val + "\n"
+			return true
+		})
+		tx.Ascend("all", func(key, val string) bool {
+			res2 += key + ":" + val + "\n"
+			return true
+		})
+		return nil
+	})
+	if res != "1:1\n2:2\n3:3\n4:4\naa:22\nbb:11\n" {
+		t.Fatal("fail")
+	}
+	if res2 != "1:1\nbb:11\n2:2\naa:22\n3:3\n4:4\n" {
+		t.Fatal("fail")
+	}
 }
 
 func TestVariousTx(t *testing.T) {
