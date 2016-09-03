@@ -22,9 +22,6 @@ database for [Tile38](https://github.com/tidwall/tile38). One that can work
 both as a performant [Raft Store](https://github.com/tidwall/raft-buntdb), 
 and a Geospatial database.
 
-Much of the API is inspired by the fantastic [BoltDB](https://github.com/boltdb/bolt),
-an amazing key/value store that can handle terabytes of data on disk.
-
 Features
 ========
 
@@ -32,14 +29,16 @@ Features
 - Embeddable with a [simple API](https://godoc.org/github.com/tidwall/buntdb)
 - [Spatial indexing](#spatial-indexes) for up to 20 dimensions; Useful for Geospatial data
 - Index fields inside [JSON](#json-indexes) documents
+- [Collate i18n Indexes](#collate-i18n-indexes) using the optional [collate package](https://github.com/tidwall/collate)
 - Create [custom indexes](#custom-indexes) for any data type
 - Support for [multi value indexes](#multi-value-index); Similar to a SQL multi column index
 - [Built-in types](#built-in-types) that are easy to get up & running; String, Uint, Int, Float
 - Flexible [iteration](#iterating) of data; ascending, descending, and ranges
-- [Durable append-only file](#append-only-file) format for persistence. 
+- [Durable append-only file](#append-only-file) format for persistence
 - Option to evict old items with an [expiration](#data-expiration) TTL
 - Tight codebase, under 2K loc using the `cloc` command
 - ACID semantics with locking [transactions](#transactions) that support rollbacks
+
 
 Getting Started
 ===============
@@ -345,7 +344,32 @@ Which will return:
 [4 8 3]
 [4 7 4]
 ```
+## Collate i18n Indexes
 
+Using the external [collate package](https://github.com/tidwall/collate) it's possible to create
+indexes that are sorted by the specified langauge. This is similar to the [SQL COLLATE keyword](https://msdn.microsoft.com/en-us/library/ms174596.aspx) found in traditional databases.
+
+To install:
+
+```
+go get -u github.com/tidwall/collate
+```
+
+
+For example:
+
+```go
+import "github.com/tidwall/collate"
+
+// To sort case-insensitive in French.
+db.CreateIndex("name", "*", collate.Index("FRENCH_CI"))
+
+// To specify that numbers should sort numerically ("2" < "12") 
+// and use a comma to represent a decimal point.
+db.CreateIndex("amount", "*", collate.Index("FRENCH_NUM")) 
+```
+
+Check out the [collate project](https://github.com/tidwall/collate) for more information.
 
 ## JSON Indexes
 Indexes can be created on individual fields inside JSON documents. BuntDB uses [GJSON](https://github.com/tidwall/gjson) under the hood.
