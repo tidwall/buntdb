@@ -184,6 +184,69 @@ func TestMutatingIterator(t *testing.T) {
 
 	}
 }
+func TestDeleteAll(t *testing.T) {
+	db := testOpen(t)
+	defer testClose(db)
+
+	db.Update(func(tx *Tx) error {
+		tx.Set("hello1", "planet1", nil)
+		tx.Set("hello2", "planet2", nil)
+		tx.Set("hello3", "planet3", nil)
+		return nil
+	})
+	db.CreateIndex("all", "*", IndexString)
+	db.Update(func(tx *Tx) error {
+		tx.Set("hello1", "planet1.1", nil)
+		tx.DeleteAll()
+		tx.Set("bb", "11", nil)
+		tx.Set("aa", "**", nil)
+		tx.Delete("aa")
+		tx.Set("aa", "22", nil)
+		return nil
+	})
+	var res string
+	var res2 string
+	db.View(func(tx *Tx) error {
+		tx.Ascend("", func(key, val string) bool {
+			res += key + ":" + val + "\n"
+			return true
+		})
+		tx.Ascend("all", func(key, val string) bool {
+			res2 += key + ":" + val + "\n"
+			return true
+		})
+		return nil
+	})
+	if res != "aa:22\nbb:11\n" {
+		t.Fatal("fail")
+	}
+	if res2 != "bb:11\naa:22\n" {
+		t.Fatal("fail")
+	}
+	db = testReOpen(t, db)
+	defer testClose(db)
+	res = ""
+	res2 = ""
+	db.CreateIndex("all", "*", IndexString)
+	db.View(func(tx *Tx) error {
+		tx.Ascend("", func(key, val string) bool {
+			res += key + ":" + val + "\n"
+			return true
+		})
+		tx.Ascend("all", func(key, val string) bool {
+			res2 += key + ":" + val + "\n"
+			return true
+		})
+		return nil
+	})
+	if res != "aa:22\nbb:11\n" {
+		t.Fatal("fail")
+	}
+	if res2 != "bb:11\naa:22\n" {
+		t.Fatal("fail")
+	}
+}
+
 func TestVariousTx(t *testing.T) {
 	db := testOpen(t)
 	defer testClose(db)
