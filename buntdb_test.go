@@ -436,9 +436,33 @@ func TestVariousTx(t *testing.T) {
 	if err := db.CreateIndex("blank", "*", nil); err != nil {
 		t.Fatal(err)
 	}
+	if err := db.CreateIndex("real", "*", IndexInt); err != nil {
+		t.Fatal(err)
+	}
 	// test scanning
 	if err := db.Update(func(tx *Tx) error {
-		_, _, err := tx.Set("nothing", "here", nil)
+		less, err := tx.GetLess("junk")
+		if err != ErrNotFound {
+			t.Fatalf("expecting a not found, got %v", err)
+		}
+		if less != nil {
+			t.Fatal("expecting nil, got a less function")
+		}
+		less, err = tx.GetLess("blank")
+		if err != ErrNotFound {
+			t.Fatalf("expecting a not found, got %v", err)
+		}
+		if less != nil {
+			t.Fatal("expecting nil, got a less function")
+		}
+		less, err = tx.GetLess("real")
+		if err != nil {
+			return err
+		}
+		if less == nil {
+			t.Fatal("expecting a less function, got nil")
+		}
+		_, _, err = tx.Set("nothing", "here", nil)
 		return err
 	}); err != nil {
 		t.Fatal(err)
@@ -543,6 +567,27 @@ func TestVariousTx(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = db.Update(func(tx *Tx) error {
+		rect, err := tx.GetRect("spat")
+		if err != nil {
+			return err
+		}
+		if rect == nil {
+			t.Fatal("expecting a rect function, got nil")
+		}
+		rect, err = tx.GetRect("junk")
+		if err != ErrNotFound {
+			t.Fatalf("expecting a not found, got %v", err)
+		}
+		if rect != nil {
+			t.Fatal("expecting nil, got a rect function")
+		}
+		rect, err = tx.GetRect("na")
+		if err != ErrNotFound {
+			t.Fatalf("expecting a not found, got %v", err)
+		}
+		if rect != nil {
+			t.Fatal("expecting nil, got a rect function")
+		}
 		if _, _, err := tx.Set("rect:1", "[10 10],[20 20]", nil); err != nil {
 			return err
 		}
@@ -553,7 +598,7 @@ func TestVariousTx(t *testing.T) {
 			return err
 		}
 		s := ""
-		err := tx.Intersects("spat", "[5 5],[13 13]", func(key, val string) bool {
+		err = tx.Intersects("spat", "[5 5],[13 13]", func(key, val string) bool {
 			s += key + ":" + val + "\n"
 			return true
 		})

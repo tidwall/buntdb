@@ -1279,6 +1279,37 @@ type SetOptions struct {
 	TTL time.Duration
 }
 
+// GetLess returns the less function for an index. This is handy for
+// doing ad-hoc compares inside a transaction.
+// Returns ErrNotFound if the index is not found or there is no less
+// function bound to the index
+func (tx *Tx) GetLess(index string) (func(a, b string) bool, error) {
+	if tx.db == nil {
+		return nil, ErrTxClosed
+	}
+	idx, ok := tx.db.idxs[index]
+	if !ok || idx.less == nil {
+		return nil, ErrNotFound
+	}
+	return idx.less, nil
+}
+
+// GetRect returns the rect function for an index. This is handy for
+// doing ad-hoc searches inside a transaction.
+// Returns ErrNotFound if the index is not found or there is no rect
+// function bound to the index
+func (tx *Tx) GetRect(index string) (func(s string) (min, max []float64),
+	error) {
+	if tx.db == nil {
+		return nil, ErrTxClosed
+	}
+	idx, ok := tx.db.idxs[index]
+	if !ok || idx.rect == nil {
+		return nil, ErrNotFound
+	}
+	return idx.rect, nil
+}
+
 // Set inserts or replaces an item in the database based on the key.
 // The opt params may be used for additional functionality such as forcing
 // the item to be evicted at a specified time. When the return value
