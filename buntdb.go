@@ -117,6 +117,10 @@ type Config struct {
 
 	// AutoShrinkDisabled turns off automatic background shrinking
 	AutoShrinkDisabled bool
+
+	// OnExpired is used to custom handle the deletion option when a key
+	// has been expired.
+	OnExpired func(keys []string)
 }
 
 // exctx is a simple b-tree context for ordering by expiration.
@@ -520,7 +524,10 @@ func (db *DB) backgroundManager() {
 		var shrink bool
 		// Open a standard view. This will take a full lock of the
 		// database thus allowing for access to anything we need.
+		var onExpired func([]string)
+		var expired []string
 		err := db.Update(func(tx *Tx) error {
+			onExpired = db.config.OnExpired
 			if db.persist && !db.config.AutoShrinkDisabled {
 				pos, err := db.file.Seek(0, 1)
 				if err != nil {
@@ -533,35 +540,45 @@ func (db *DB) backgroundManager() {
 				}
 			}
 			// produce a list of expired items that need removing
-			var remove []*dbItem
 			db.exps.AscendLessThan(&dbItem{
 				opts: &dbItemOpts{ex: true, exat: time.Now()},
 			}, func(item btree.Item) bool {
-				remove = append(remove, item.(*dbItem))
+				expired = append(expired, item.(*dbItem).key)
 				return true
 			})
-			for _, item := range remove {
-				if _, err := tx.Delete(item.key); err != nil {
-					// it's ok to get a "not found" because the
-					// 'Delete' method reports "not found" for
-					// expired items.
-					if err != ErrNotFound {
-						return err
+			if onExpired == nil {
+				for _, key := range expired {
+					if _, err := tx.Delete(key); err != nil {
+						// it's ok to get a "not found" because the
+						// 'Delete' method reports "not found" for
+						// expired items.
+						if err != ErrNotFound {
+							return err
+						}
 					}
 				}
-			}
-
-			// execute a disk sync.
-			if db.persist && db.config.SyncPolicy == EverySecond &&
-				flushes != db.flushes {
-				_ = db.file.Sync()
-				flushes = db.flushes
 			}
 			return nil
 		})
 		if err == ErrDatabaseClosed {
 			break
 		}
+
+		// send expired event, if needed
+		if onExpired != nil && len(expired) > 0 {
+			onExpired(expired)
+		}
+
+		// execute a disk sync, if needed
+		func() {
+			db.mu.Lock()
+			defer db.mu.Unlock()
+			if db.persist && db.config.SyncPolicy == EverySecond &&
+				flushes != db.flushes {
+				_ = db.file.Sync()
+				flushes = db.flushes
+			}
+		}()
 		if shrink {
 			if err = db.Shrink(); err != nil {
 				if err == ErrDatabaseClosed {
