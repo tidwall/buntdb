@@ -593,7 +593,7 @@ func TestVariousTx(t *testing.T) {
 	if _, err := db.file.Seek(0, 2); err != nil {
 		t.Fatal(err)
 	}
-	db.buf = &bytes.Buffer{}
+	db.buf = nil
 	if err := db.CreateIndex("blank", "*", nil); err != nil {
 		t.Fatal(err)
 	}
