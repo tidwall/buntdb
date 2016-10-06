@@ -6,7 +6,6 @@ package buntdb
 
 import (
 	"bufio"
-	"bytes"
 	"errors"
 	"io"
 	"os"
@@ -18,6 +17,7 @@ import (
 
 	"github.com/tidwall/btree"
 	"github.com/tidwall/gjson"
+	"github.com/tidwall/grect"
 	"github.com/tidwall/match"
 	"github.com/tidwall/rtree"
 )
@@ -1897,37 +1897,8 @@ func (tx *Tx) Indexes() ([]string, error) {
 // of a rect. IndexRect() is the reverse function and can be used
 // to generate a rect from a string.
 func Rect(min, max []float64) string {
-	if min == nil && max == nil {
-		return ""
-	}
-	diff := len(min) != len(max)
-	if !diff {
-		for i := 0; i < len(min); i++ {
-			if min[i] != max[i] {
-				diff = true
-				break
-			}
-		}
-	}
-	var b bytes.Buffer
-	_ = b.WriteByte('[')
-	for i, v := range min {
-		if i > 0 {
-			_ = b.WriteByte(' ')
-		}
-		_, _ = b.WriteString(strconv.FormatFloat(v, 'f', -1, 64))
-	}
-	if diff {
-		_, _ = b.WriteString("],[")
-		for i, v := range max {
-			if i > 0 {
-				_ = b.WriteByte(' ')
-			}
-			_, _ = b.WriteString(strconv.FormatFloat(v, 'f', -1, 64))
-		}
-	}
-	_ = b.WriteByte(']')
-	return b.String()
+	r := grect.Rect{Min: min, Max: max}
+	return r.String()
 }
 
 // Point is a helper function that converts a series of float64s
@@ -1940,33 +1911,8 @@ func Point(coords ...float64) string {
 // Rect() is the reverse function and can be used to generate a string
 // from a rect.
 func IndexRect(a string) (min, max []float64) {
-	parts := strings.Split(a, ",")
-	for i := 0; i < len(parts) && i < 2; i++ {
-		part := parts[i]
-		if len(part) >= 2 && part[0] == '[' && part[len(part)-1] == ']' {
-			pieces := strings.Split(part[1:len(part)-1], " ")
-			if i == 0 {
-				min = make([]float64, 0, len(pieces))
-			} else {
-				max = make([]float64, 0, len(pieces))
-			}
-			for j := 0; j < len(pieces); j++ {
-				piece := pieces[j]
-				if piece != "" {
-					n, _ := strconv.ParseFloat(piece, 64)
-					if i == 0 {
-						min = append(min, n)
-					} else {
-						max = append(max, n)
-					}
-				}
-			}
-		}
-	}
-	if len(parts) == 1 {
-		max = min
-	}
-	return
+	r := grect.Get(a)
+	return r.Min, r.Max
 }
 
 // IndexString is a helper function that return true if 'a' is less than 'b'.

@@ -1239,7 +1239,7 @@ func TestIndexCompare(t *testing.T) {
 	if Rect(IndexRect("[1 2 3 4]")) != "[1 2 3 4]" {
 		t.Fatalf("expected '%v', got '%v'", "[1 2 3 4]", Rect(IndexRect("[1 2 3 4]")))
 	}
-	if Rect(nil, nil) != "" {
+	if Rect(nil, nil) != "[]" {
 		t.Fatalf("expected '%v', got '%v'", "", Rect(nil, nil))
 	}
 	if Point(1, 2, 3) != "[1 2 3]" {
@@ -1780,9 +1780,9 @@ func TestRectStrings(t *testing.T) {
 	test(t, Rect(IndexRect(Rect(IndexRect("[1 2],[2 2],[3]")))) == "[1 2],[2 2]", true)
 	test(t, Rect(IndexRect(Rect(IndexRect("[1 2]")))) == "[1 2]", true)
 	test(t, Rect(IndexRect(Rect(IndexRect("[1.5 2 4.5 5.6]")))) == "[1.5 2 4.5 5.6]", true)
-	test(t, Rect(IndexRect(Rect(IndexRect("[1.5 2 4.5 5.6 -1],[]")))) == "[1.5 2 4.5 5.6 -1],[]", true)
+	test(t, Rect(IndexRect(Rect(IndexRect("[1.5 2 4.5 5.6 -1],[]")))) == "[1.5 2 4.5 5.6 -1]", true)
 	test(t, Rect(IndexRect(Rect(IndexRect("[]")))) == "[]", true)
-	test(t, Rect(IndexRect(Rect(IndexRect("")))) == "", true)
+	test(t, Rect(IndexRect(Rect(IndexRect("")))) == "[]", true)
 	if err := testRectStringer(nil, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -1801,7 +1801,7 @@ func TestRectStrings(t *testing.T) {
 	if err := testRectStringer([]float64{1, 2, 3, 4}, []float64{5, 6, 7, 8}); err != nil {
 		t.Fatal(err)
 	}
-	if err := testRectStringer([]float64{1, 2, 3, 4, 5}, []float64{6, 7, 8, 9, 0}); err != nil {
+	if err := testRectStringer([]float64{1, 2, 3, 4, 5}, []float64{6, 7, 8, 9, 10}); err != nil {
 		t.Fatal(err)
 	}
 }
