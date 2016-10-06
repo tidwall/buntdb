@@ -980,7 +980,7 @@ type txWriteContext struct {
 	rollbackIndexes map[string]*index  // details for dropped indexes.
 }
 
-// ClearAll deletes all items from the database.
+// DeleteAll deletes all items from the database.
 func (tx *Tx) DeleteAll() error {
 	if tx.db == nil {
 		return ErrTxClosed

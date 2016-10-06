@@ -823,7 +823,7 @@ func TestVariousTx(t *testing.T) {
 	}
 }
 
-func ExampleDescKeys() {
+func Example_descKeys() {
 	db, _ := Open(":memory:")
 	db.CreateIndex("name", "*", IndexString)
 	db.Update(func(tx *Tx) error {
