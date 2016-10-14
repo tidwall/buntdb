@@ -144,6 +144,7 @@ func TestSaveLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
 func TestMutatingIterator(t *testing.T) {
 	db := testOpen(t)
 	defer testClose(db)
@@ -181,9 +182,54 @@ func TestMutatingIterator(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-
 	}
 }
+
+func TestCaseInsensitiveIndex(t *testing.T) {
+	db := testOpen(t)
+	defer testClose(db)
+	count := 1000
+	if err := db.Update(func(tx *Tx) error {
+		opts := &IndexOptions{
+			CaseInsensitiveKeyMatching: true,
+		}
+		return tx.CreateIndexOptions("ages", "User:*:age", opts, IndexInt)
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.Update(func(tx *Tx) error {
+		for j := 0; j < count; j++ {
+			key := fmt.Sprintf("user:%d:age", j)
+			val := fmt.Sprintf("%d", rand.Intn(100))
+			if _, _, err := tx.Set(key, val, nil); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.View(func(tx *Tx) error {
+		var vals []string
+		err := tx.Ascend("ages", func(key, value string) bool {
+			vals = append(vals, value)
+			return true
+		})
+		if err != nil {
+			return err
+		}
+		if len(vals) != count {
+			return fmt.Errorf("expected '%v', got '%v'", count, len(vals))
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+}
+
 func TestIndexTransaction(t *testing.T) {
 	db := testOpen(t)
 	defer testClose(db)
