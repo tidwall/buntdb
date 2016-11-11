@@ -18,9 +18,7 @@ data. It's ideal for projects that need a dependable database and favor
 speed over data size.
 
 The desire to create BuntDB stems from the need for a new embeddable
-database for [Tile38](https://github.com/tidwall/tile38) and [SummitDB](https://github.com/tidwall/summitdb). One that can work 
-both as a performant [Raft Store](https://github.com/tidwall/raft-buntdb), 
-and a Geospatial database.
+database for [Tile38](https://github.com/tidwall/tile38) and [SummitDB](https://github.com/tidwall/summitdb).
 
 Features
 ========
