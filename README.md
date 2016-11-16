@@ -458,7 +458,7 @@ This will create a multi value index where the last name is ascending and the ag
 ## Collate i18n Indexes
 
 Using the external [collate package](https://github.com/tidwall/collate) it's possible to create
-indexes that are sorted by the specified langauge. This is similar to the [SQL COLLATE keyword](https://msdn.microsoft.com/en-us/library/ms174596.aspx) found in traditional databases.
+indexes that are sorted by the specified language. This is similar to the [SQL COLLATE keyword](https://msdn.microsoft.com/en-us/library/ms174596.aspx) found in traditional databases.
 
 To install:
 
