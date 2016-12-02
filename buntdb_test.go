@@ -567,6 +567,54 @@ func TestVariousTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// test non-managed transactions
+	tx, err := db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	_, _, err = tx.Set("howdy", "world", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	tx, err = db.Begin(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	v, err := tx.Get("howdy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v != "world" {
+		t.Fatalf("expecting '%v', got '%v'", "world", v)
+	}
+	if err := tx.Rollback(); err != nil {
+		t.Fatal(err)
+	}
+	tx, err = db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	v, err = tx.Get("howdy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v != "world" {
+		t.Fatalf("expecting '%v', got '%v'", "world", v)
+	}
+	_, err = tx.Delete("howdy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
 	// test for invalid commits
 	if err := db.Update(func(tx *Tx) error {
 		// we are going to do some hackery
@@ -577,7 +625,7 @@ func TestVariousTx(t *testing.T) {
 				}
 			}
 		}()
-		return tx.commit()
+		return tx.Commit()
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -592,7 +640,7 @@ func TestVariousTx(t *testing.T) {
 				}
 			}
 		}()
-		return tx.rollback()
+		return tx.Rollback()
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -1852,7 +1900,7 @@ func TestRectStrings(t *testing.T) {
 	}
 }
 
-// TestTTLReOpen test setting a TTL and then immediatelly closing the database and
+// TestTTLReOpen test setting a TTL and then immediately closing the database and
 // then waiting the TTL before reopening. The key should not be accessible.
 func TestTTLReOpen(t *testing.T) {
 	ttl := time.Second * 3

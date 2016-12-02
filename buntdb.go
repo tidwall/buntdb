@@ -916,22 +916,22 @@ func (db *DB) load() error {
 // This method is intended to be wrapped by Update and View
 func (db *DB) managed(writable bool, fn func(tx *Tx) error) (err error) {
 	var tx *Tx
-	tx, err = db.begin(writable)
+	tx, err = db.Begin(writable)
 	if err != nil {
 		return
 	}
 	defer func() {
 		if err != nil {
 			// The caller returned an error. We must rollback.
-			_ = tx.rollback()
+			_ = tx.Rollback()
 			return
 		}
 		if writable {
 			// Everything went well. Lets Commit()
-			err = tx.commit()
+			err = tx.Commit()
 		} else {
 			// read-only transaction can only roll back.
-			err = tx.rollback()
+			err = tx.Rollback()
 		}
 	}()
 	tx.funcd = true
@@ -1032,14 +1032,14 @@ func (tx *Tx) DeleteAll() error {
 	return nil
 }
 
-// begin opens a new transaction.
+// Begin opens a new transaction.
 // Multiple read-only transactions can be opened at the same time but there can
 // only be one read/write transaction at a time. Attempting to open a read/write
 // transactions while another one is in progress will result in blocking until
 // the current read/write transaction is completed.
 //
 // All transactions must be closed by calling Commit() or Rollback() when done.
-func (db *DB) begin(writable bool) (*Tx, error) {
+func (db *DB) Begin(writable bool) (*Tx, error) {
 	tx := &Tx{
 		db:       db,
 		writable: writable,
@@ -1109,10 +1109,10 @@ func (tx *Tx) rollbackInner() {
 	}
 }
 
-// commit writes all changes to disk.
+// Commit writes all changes to disk.
 // An error is returned when a write error occurs, or when a Commit() is called
 // from a read-only transaction.
-func (tx *Tx) commit() error {
+func (tx *Tx) Commit() error {
 	if tx.funcd {
 		panic("managed tx commit not allowed")
 	}
@@ -1155,11 +1155,11 @@ func (tx *Tx) commit() error {
 	return err
 }
 
-// rollback closes the transaction and reverts all mutable operations that
+// Rollback closes the transaction and reverts all mutable operations that
 // were performed on the transaction such as Set() and Delete().
 //
 // Read-only transactions can only be rolled back, not committed.
-func (tx *Tx) rollback() error {
+func (tx *Tx) Rollback() error {
 	if tx.funcd {
 		panic("managed tx rollback not allowed")
 	}
@@ -1763,7 +1763,7 @@ func (tx *Tx) Len() (int, error) {
 	return tx.db.keys.Len(), nil
 }
 
-// IndexOptions provides an index with addtional features or
+// IndexOptions provides an index with additional features or
 // alternate functionality.
 type IndexOptions struct {
 	// CaseInsensitiveKeyMatching allow for case-insensitive
@@ -1792,7 +1792,7 @@ func (tx *Tx) CreateIndex(name, pattern string,
 }
 
 // CreateIndexOptions is the same as CreateIndex except that it allows
-// for additonal options.
+// for additional options.
 func (tx *Tx) CreateIndexOptions(name, pattern string,
 	opts *IndexOptions,
 	less ...func(a, b string) bool) error {
@@ -1819,7 +1819,7 @@ func (tx *Tx) CreateSpatialIndex(name, pattern string,
 }
 
 // CreateSpatialIndexOptions is the same as CreateSpatialIndex except that
-// it allows for additonal options.
+// it allows for additional options.
 func (tx *Tx) CreateSpatialIndexOptions(name, pattern string,
 	opts *IndexOptions,
 	rect func(item string) (min, max []float64)) error {
