@@ -9,7 +9,6 @@
 <a href="https://godoc.org/github.com/tidwall/buntdb"><img src="https://img.shields.io/badge/api-reference-blue.svg?style=flat-square" alt="GoDoc"></a>
 </p>
 
-
 BuntDB is a low-level, in-memory, key/value store in pure Go. 
 It persists to disk, is ACID compliant, and uses locking for multiple
 readers and a single writer. It supports custom indexes and geospatial 
