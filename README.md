@@ -148,7 +148,9 @@ err := tx.Ascend("", func(key, value string) bool{
 })
 ```
 
-There is also `AscendGreaterOrEqual`, `AscendLessThan`, `AscendRange`, `Descend`, `DescendLessOrEqual`, `DescendGreaterThan`, and `DescendRange`. Please see the [documentation](https://godoc.org/github.com/tidwall/buntdb) for more information on these functions.
+There is also `AscendGreaterOrEqual`, `AscendLessThan`, `AscendRange`, `AscendEqual`, `Descend`, `DescendLessOrEqual`, `DescendGreaterThan`, `DescendRange`, and `DescendEqual`. Please see the [documentation](https://godoc.org/github.com/tidwall/buntdb) for more information on these functions.
+
+
 
 
 ## Custom Indexes

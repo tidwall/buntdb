@@ -1185,6 +1185,7 @@ type dbItemOpts struct {
 type dbItem struct {
 	key, val string      // the binary key and value
 	opts     *dbItemOpts // optional meta information
+	keyless  bool        // keyless item for scanning
 }
 
 func appendArray(buf []byte, count int) []byte {
@@ -1278,6 +1279,11 @@ func (dbi *dbItem) Less(item btree.Item, ctx interface{}) bool {
 		}
 	}
 	// Always fall back to the key comparison. This creates absolute uniqueness.
+	if dbi.keyless {
+		return false
+	} else if dbi2.keyless {
+		return true
+	}
 	return dbi.key < dbi2.key
 }
 
@@ -1507,6 +1513,10 @@ func (tx *Tx) scan(desc, gt, lt bool, index, start, stop string,
 		} else {
 			itemA = &dbItem{val: start}
 			itemB = &dbItem{val: stop}
+			if desc {
+				itemA.keyless = true
+				itemB.keyless = true
+			}
 		}
 	}
 	// execute the scan on the underlying tree.
@@ -1707,6 +1717,62 @@ func (tx *Tx) DescendRange(index, lessOrEqual, greaterThan string,
 	return tx.scan(
 		true, true, true, index, lessOrEqual, greaterThan, iterator,
 	)
+}
+
+// AscendEqual calls the iterator for every item in the database that equals
+// pivot, until iterator returns false.
+// When an index is provided, the results will be ordered by the item values
+// as specified by the less() function of the defined index.
+// When an index is not provided, the results will be ordered by the item key.
+// An invalid index will return an error.
+func (tx *Tx) AscendEqual(index, pivot string,
+	iterator func(key, value string) bool) error {
+	var err error
+	var less func(a, b string) bool
+	if index != "" {
+		less, err = tx.GetLess(index)
+		if err != nil {
+			return err
+		}
+	}
+	return tx.AscendGreaterOrEqual(index, pivot, func(key, value string) bool {
+		if less == nil {
+			if key != pivot {
+				return false
+			}
+		} else if less(pivot, value) {
+			return false
+		}
+		return iterator(key, value)
+	})
+}
+
+// DescendEqual calls the iterator for every item in the database that equals
+// pivot, until iterator returns false.
+// When an index is provided, the results will be ordered by the item values
+// as specified by the less() function of the defined index.
+// When an index is not provided, the results will be ordered by the item key.
+// An invalid index will return an error.
+func (tx *Tx) DescendEqual(index, pivot string,
+	iterator func(key, value string) bool) error {
+	var err error
+	var less func(a, b string) bool
+	if index != "" {
+		less, err = tx.GetLess(index)
+		if err != nil {
+			return err
+		}
+	}
+	return tx.DescendLessOrEqual(index, pivot, func(key, value string) bool {
+		if less == nil {
+			if key != pivot {
+				return false
+			}
+		} else if less(value, pivot) {
+			return false
+		}
+		return iterator(key, value)
+	})
 }
 
 // rect is used by Intersects

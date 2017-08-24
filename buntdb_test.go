@@ -495,6 +495,110 @@ func TestDeleteAll(t *testing.T) {
 	}
 }
 
+func TestAscendEqual(t *testing.T) {
+	db := testOpen(t)
+	defer testClose(db)
+	if err := db.Update(func(tx *Tx) error {
+		for i := 0; i < 300; i++ {
+			_, _, err := tx.Set(fmt.Sprintf("key:%05dA", i), fmt.Sprintf("%d", i+1000), nil)
+			if err != nil {
+				return err
+			}
+			_, _, err = tx.Set(fmt.Sprintf("key:%05dB", i), fmt.Sprintf("%d", i+1000), nil)
+			if err != nil {
+				return err
+			}
+		}
+		return tx.CreateIndex("num", "*", IndexInt)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var res []string
+	if err := db.View(func(tx *Tx) error {
+		return tx.AscendEqual("", "key:00055A", func(key, value string) bool {
+			res = append(res, key)
+			return true
+		})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(res) != 1 {
+		t.Fatalf("expected %v, got %v", 1, len(res))
+	}
+	if res[0] != "key:00055A" {
+		t.Fatalf("expected %v, got %v", "key:00055A", res[0])
+	}
+	res = nil
+	if err := db.View(func(tx *Tx) error {
+		return tx.AscendEqual("num", "1125", func(key, value string) bool {
+			res = append(res, key)
+			return true
+		})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(res) != 2 {
+		t.Fatalf("expected %v, got %v", 2, len(res))
+	}
+	if res[0] != "key:00125A" {
+		t.Fatalf("expected %v, got %v", "key:00125A", res[0])
+	}
+	if res[1] != "key:00125B" {
+		t.Fatalf("expected %v, got %v", "key:00125B", res[1])
+	}
+}
+func TestDescendEqual(t *testing.T) {
+	db := testOpen(t)
+	defer testClose(db)
+	if err := db.Update(func(tx *Tx) error {
+		for i := 0; i < 300; i++ {
+			_, _, err := tx.Set(fmt.Sprintf("key:%05dA", i), fmt.Sprintf("%d", i+1000), nil)
+			if err != nil {
+				return err
+			}
+			_, _, err = tx.Set(fmt.Sprintf("key:%05dB", i), fmt.Sprintf("%d", i+1000), nil)
+			if err != nil {
+				return err
+			}
+		}
+		return tx.CreateIndex("num", "*", IndexInt)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var res []string
+	if err := db.View(func(tx *Tx) error {
+		return tx.DescendEqual("", "key:00055A", func(key, value string) bool {
+			res = append(res, key)
+			return true
+		})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(res) != 1 {
+		t.Fatalf("expected %v, got %v", 1, len(res))
+	}
+	if res[0] != "key:00055A" {
+		t.Fatalf("expected %v, got %v", "key:00055A", res[0])
+	}
+	res = nil
+	if err := db.View(func(tx *Tx) error {
+		return tx.DescendEqual("num", "1125", func(key, value string) bool {
+			res = append(res, key)
+			return true
+		})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(res) != 2 {
+		t.Fatalf("expected %v, got %v", 2, len(res))
+	}
+	if res[0] != "key:00125B" {
+		t.Fatalf("expected %v, got %v", "key:00125B", res[0])
+	}
+	if res[1] != "key:00125A" {
+		t.Fatalf("expected %v, got %v", "key:00125A", res[1])
+	}
+}
 func TestVariousTx(t *testing.T) {
 	db := testOpen(t)
 	defer testClose(db)
