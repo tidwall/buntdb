@@ -134,7 +134,7 @@ err := db.View(func(tx *buntdb.Tx) error {
 })
 ```
 
-Getting non-existent values will case an `ErrNotFound` error.
+Getting non-existent values will cause an `ErrNotFound` error.
 
 ### Iterating
 All keys/value pairs are ordered in the database by the key. To iterate over the keys:
