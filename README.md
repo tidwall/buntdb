@@ -249,13 +249,13 @@ db.View(func(tx *buntdb.Tx) error {
 
 The output should be:
 ```
-user:6:name 3
-user:5:name 8
-user:2:name 13
-user:7:name 16
-user:0:name 35
-user:1:name 49
-user:4:name 63
+user:6:age 3
+user:5:age 8
+user:2:age 13
+user:7:age 16
+user:0:age 35
+user:1:age 49
+user:4:age 63
 ```
 
 ## Spatial Indexes
