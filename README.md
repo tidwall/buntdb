@@ -307,10 +307,10 @@ The bracket syntax `[-117 30],[-112 36]` is unique to BuntDB, and it's how the b
 - **2D point:** `[10 15]`
 *XY: "10x15"*
 
-- **LatLon point:** `[-112.2693 33.5123]`
+- **LonLat point:** `[-112.2693 33.5123]`
 *LatLon: "33.5123 -112.2693"*
 
-- **LatLon bounding box:** `[-112.26 33.51],[-112.18 33.67]`
+- **LonLat bounding box:** `[-112.26 33.51],[-112.18 33.67]`
 *Min LatLon: "33.51 -112.26", Max LatLon: "33.67 -112.18"*
 
 **Notice:** The longitude is the Y axis and is on the left, and latitude is the X axis and is on the right.
