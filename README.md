@@ -141,7 +141,7 @@ All keys/value pairs are ordered in the database by the key. To iterate over the
 
 ```go
 err := db.View(func(tx *buntdb.Tx) error {
-err := tx.Ascend("", func(key, value string) bool{
+    err := tx.Ascend("", func(key, value string) bool {
     	fmt.Printf("key: %s, value: %s\n", key, value)
     })
     return err
