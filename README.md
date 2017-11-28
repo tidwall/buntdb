@@ -1,6 +1,6 @@
 <p align="center">
-<img 
-    src="logo.png" 
+<img
+    src="logo.png"
     width="307" height="150" border="0" alt="BuntDB">
 <br>
 <a href="https://travis-ci.org/tidwall/buntdb"><img src="https://img.shields.io/travis/tidwall/buntdb.svg?style=flat-square" alt="Build Status"></a>
@@ -9,10 +9,10 @@
 <a href="https://godoc.org/github.com/tidwall/buntdb"><img src="https://img.shields.io/badge/api-reference-blue.svg?style=flat-square" alt="GoDoc"></a>
 </p>
 
-BuntDB is a low-level, in-memory, key/value store in pure Go. 
+BuntDB is a low-level, in-memory, key/value store in pure Go.
 It persists to disk, is ACID compliant, and uses locking for multiple
-readers and a single writer. It supports custom indexes and geospatial 
-data. It's ideal for projects that need a dependable database and favor 
+readers and a single writer. It supports custom indexes and geospatial
+data. It's ideal for projects that need a dependable database and favor
 speed over data size.
 
 The desire to create BuntDB stems from the need for a new embeddable
@@ -52,7 +52,7 @@ This will retrieve the library.
 
 ## Opening a database
 
-The primary object in BuntDB is a `DB`. To open or create your 
+The primary object in BuntDB is a `DB`. To open or create your
 database, use the `buntdb.Open()` function:
 
 ```go
@@ -71,8 +71,8 @@ func main() {
 		log.Fatal(err)
 	}
 	defer db.Close()
-	
-	... 
+
+	...
 }
 ```
 
@@ -100,7 +100,7 @@ err := db.View(func(tx *buntdb.Tx) error {
 ```
 
 ### Read/write Transactions
-A read/write transaction is used when you need to make changes to your data. There can only be one read/write transaction running at a time. So make sure you close it as soon as you are done with it. 
+A read/write transaction is used when you need to make changes to your data. There can only be one read/write transaction running at a time. So make sure you close it as soon as you are done with it.
 
 ```go
 err := db.Update(func(tx *buntdb.Tx) error {
@@ -125,11 +125,11 @@ To get the value:
 
 ```go
 err := db.View(func(tx *buntdb.Tx) error {
-    val, err := tx.Get("mykey") 
+    val, err := tx.Get("mykey")
     if err != nil{
     	return err
     }
-    fmt.Printf("value is %s\n", val) 
+    fmt.Printf("value is %s\n", val)
     return nil
 })
 ```
@@ -213,7 +213,7 @@ Now only items with keys that have the prefix `user:` will be added to the `name
 
 
 ### Built-in types
-Along with `IndexString`, there is also `IndexInt`, `IndexUint`, and `IndexFloat`. 
+Along with `IndexString`, there is also `IndexInt`, `IndexUint`, and `IndexFloat`.
 These are built-in types for indexing. You can choose to use these or create your own.
 
 So to create an index that is numerically ordered on an age key, we could use:
@@ -298,24 +298,24 @@ This will get all three positions.
 
 The bracket syntax `[-117 30],[-112 36]` is unique to BuntDB, and it's how the built-in rectangles are processed. But, you are not limited to this syntax. Whatever Rect function you choose to use during `CreateSpatialIndex` will be used to process the parameter, in this case it's `IndexRect`.
 
-- **2D rectangle:** `[10 15],[20 25]`  
+- **2D rectangle:** `[10 15],[20 25]`
 *Min XY: "10x15", Max XY: "20x25"*
 
-- **3D rectangle:** `[10 15 12],[20 25 18]`  
+- **3D rectangle:** `[10 15 12],[20 25 18]`
 *Min XYZ: "10x15x12", Max XYZ: "20x25x18"*
 
-- **2D point:** `[10 15]`  
+- **2D point:** `[10 15]`
 *XY: "10x15"*
 
-- **LatLon point:** `[-112.2693 33.5123]`  
+- **LatLon point:** `[-112.2693 33.5123]`
 *LatLon: "33.5123 -112.2693"*
 
-- **LatLon bounding box:** `[-112.26 33.51],[-112.18 33.67]`  
+- **LatLon bounding box:** `[-112.26 33.51],[-112.18 33.67]`
 *Min LatLon: "33.51 -112.26", Max LatLon: "33.67 -112.18"*
 
 **Notice:** The longitude is the Y axis and is on the left, and latitude is the X axis and is on the right.
 
-You can also represent `Infinity` by using `-inf` and `+inf`.  
+You can also represent `Infinity` by using `-inf` and `+inf`.
 For example, you might have the following points (`[X Y M]` where XY is a point and M is a timestamp):
 ```
 [3 9 1]
@@ -410,7 +410,7 @@ Order by age range 30-50
 ```
 
 ## Multi Value Index
-With BuntDB it's possible to join multiple values on a single index. 
+With BuntDB it's possible to join multiple values on a single index.
 This is similar to a [multi column index](http://dev.mysql.com/doc/refman/5.7/en/multiple-column-indexes.html) in a traditional SQL database.
 
 In this example we are creating a multi value index on "name.last" and "age":
@@ -448,8 +448,8 @@ db.View(func(tx *buntdb.Tx) error {
 Any index can be put in descending order by wrapping it's less function with `buntdb.Desc`.
 
 ```go
-db.CreateIndex("last_name_age", "*", 
-	buntdb.IndexJSON("name.last"), 
+db.CreateIndex("last_name_age", "*",
+	buntdb.IndexJSON("name.last"),
 	buntdb.Desc(buntdb.IndexJSON("age")))
 ```
 
@@ -474,9 +474,9 @@ import "github.com/tidwall/collate"
 // To sort case-insensitive in French.
 db.CreateIndex("name", "*", collate.IndexString("FRENCH_CI"))
 
-// To specify that numbers should sort numerically ("2" < "12") 
+// To specify that numbers should sort numerically ("2" < "12")
 // and use a comma to represent a decimal point.
-db.CreateIndex("amount", "*", collate.IndexString("FRENCH_NUM")) 
+db.CreateIndex("amount", "*", collate.IndexString("FRENCH_NUM"))
 ```
 
 There's also support for Collation on JSON indexes:
@@ -501,7 +501,7 @@ Now `mykey` will automatically be deleted after one second. You can remove the T
 
 ## Append-only File
 
-BuntDB uses an AOF (append-only file) which is a log of all database changes that occur from operations like `Set()` and `Delete()`. 
+BuntDB uses an AOF (append-only file) which is a log of all database changes that occur from operations like `Set()` and `Delete()`.
 
 The format of this file looks like:
 ```
@@ -531,7 +531,7 @@ The `Config.SyncPolicy` has the following options:
 - `EverySecond` - fsync every second, fast and safer, this is the default
 - `Always` - fsync after every write, very durable, slower
 
-## Config 
+## Config
 
 Here are some configuration options that can be use to change various behaviors of the database.
 
@@ -557,7 +557,7 @@ if err := db.WriteConfig(config); err != nil{
 
 How fast is BuntDB?
 
-Here are some example [benchmarks](https://github.com/tidwall/raft-buntdb#raftstore-performance-comparison) when using BuntDB in a Raft Store implementation. 
+Here are some example [benchmarks](https://github.com/tidwall/raft-buntdb#raftstore-performance-comparison) when using BuntDB in a Raft Store implementation.
 
 You can also run the standard Go benchmark tool from the project root directory:
 
