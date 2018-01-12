@@ -1021,6 +1021,46 @@ func TestVariousTx(t *testing.T) {
 	}
 }
 
+func TestNearby(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
+	N := 100000
+	db, _ := Open(":memory:")
+	db.CreateSpatialIndex("points", "*", IndexRect)
+	db.Update(func(tx *Tx) error {
+		for i := 0; i < N; i++ {
+			p := Point(
+				rand.Float64()*100,
+				rand.Float64()*100,
+				rand.Float64()*100,
+				rand.Float64()*100,
+			)
+			tx.Set(fmt.Sprintf("p:%d", i), p, nil)
+		}
+		return nil
+	})
+	var keys, values []string
+	var dists []float64
+	var pdist float64
+	var i int
+	db.View(func(tx *Tx) error {
+		tx.Nearby("points", Point(0, 0, 0, 0), func(key, value string, dist float64) bool {
+			if i != 0 && dist < pdist {
+				t.Fatal("out of order")
+			}
+			keys = append(keys, key)
+			values = append(values, value)
+			dists = append(dists, dist)
+			pdist = dist
+			i++
+			return true
+		})
+		return nil
+	})
+	if len(keys) != N {
+		t.Fatalf("expected '%v', got '%v'", N, len(keys))
+	}
+}
+
 func Example_descKeys() {
 	db, _ := Open(":memory:")
 	db.CreateIndex("name", "*", IndexString)

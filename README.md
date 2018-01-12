@@ -294,6 +294,20 @@ db.View(func(tx *buntdb.Tx) error {
 
 This will get all three positions.
 
+### k-Nearest Neighbors
+
+Use the `Nearby` function to get all the positions in order of nearest to farthest :
+
+```go
+db.View(func(tx *buntdb.Tx) error {
+    tx.Nearby("fleet", "[-113 33]", func(key, val string, dist float64) bool {
+    	...
+    	return true
+    })
+    return nil
+})
+```
+
 ### Spatial bracket syntax
 
 The bracket syntax `[-117 30],[-112 36]` is unique to BuntDB, and it's how the built-in rectangles are processed. But, you are not limited to this syntax. Whatever Rect function you choose to use during `CreateSpatialIndex` will be used to process the parameter, in this case it's `IndexRect`.
