@@ -119,7 +119,9 @@ type Config struct {
 	AutoShrinkDisabled bool
 
 	// OnExpired is used to custom handle the deletion option when a key
-	// has been expired.
+	// has been expired. If OnExpired is present, the entries will not get deleted
+	// and it's the responsibility of OnExpired to delete them - or re-set
+	// them - for a sliding timeout.
 	OnExpired func(keys []string)
 }
 
