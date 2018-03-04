@@ -2551,3 +2551,98 @@ func TestJSONIndex(t *testing.T) {
 		t.Fatalf("expected %v, got %v", expect, strings.Join(keys, ","))
 	}
 }
+
+func TestOnExpiredSync(t *testing.T) {
+	db := testOpen(t)
+	defer testClose(db)
+
+	var config Config
+	if err := db.ReadConfig(&config); err != nil {
+		t.Fatal(err)
+	}
+	hits := make(chan int, 3)
+	config.OnExpiredSync = func(key, value string, tx *Tx) error {
+		n, err := strconv.Atoi(value)
+		if err != nil {
+			return err
+		}
+		defer func() { hits <- n }()
+		if n >= 2 {
+			_, err = tx.Delete(key)
+			if err != ErrNotFound {
+				return err
+			}
+			return nil
+		}
+		n++
+		_, _, err = tx.Set(key, strconv.Itoa(n), &SetOptions{Expires: true, TTL: time.Millisecond * 100})
+		return err
+	}
+	if err := db.SetConfig(config); err != nil {
+		t.Fatal(err)
+	}
+	err := db.Update(func(tx *Tx) error {
+		_, _, err := tx.Set("K", "0", &SetOptions{Expires: true, TTL: time.Millisecond * 100})
+		return err
+	})
+	if err != nil {
+		t.Fail()
+	}
+
+	done := make(chan struct{})
+	go func() {
+		ticks := time.NewTicker(time.Millisecond * 50)
+		defer ticks.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticks.C:
+				err := db.View(func(tx *Tx) error {
+					v, err := tx.Get("K", true)
+					if err != nil {
+						return err
+					}
+					n, err := strconv.Atoi(v)
+					if err != nil {
+						return err
+					}
+					if n < 0 || n > 2 {
+						t.Fail()
+					}
+					return nil
+				})
+				if err != nil {
+					t.Fail()
+				}
+			}
+		}
+	}()
+
+OUTER1:
+	for {
+		select {
+		case <-time.After(time.Second * 2):
+			t.Fail()
+		case v := <-hits:
+			if v >= 2 {
+				break OUTER1
+			}
+		}
+	}
+	err = db.View(func(tx *Tx) error {
+		defer close(done)
+		v, err := tx.Get("K")
+		if err != nil {
+			t.Fail()
+			return err
+		}
+		if v != "2" {
+			t.Fail()
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fail()
+	}
+}
