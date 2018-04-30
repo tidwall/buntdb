@@ -1816,6 +1816,8 @@ func (r *rect) Rect(ctx interface{}) (min, max []float64) {
 // is represented by the rect string. This string will be processed by the
 // same bounds function that was passed to the CreateSpatialIndex() function.
 // An invalid index will return an error.
+// The dist param is the distance of the bounding boxes. In the case of
+// simple 2D points, it's the distance of the two 2D points squared.
 func (tx *Tx) Nearby(index, bounds string,
 	iterator func(key, value string, dist float64) bool) error {
 	if tx.db == nil {
