@@ -510,6 +510,25 @@ db.Update(func(tx *buntdb.Tx) error {
 
 Now `mykey` will automatically be deleted after one second. You can remove the TTL by setting the value again with the same key/value, but with the options parameter set to nil.
 
+## Delete while iterating
+BuntDB does not currently support deleting a key while in the process of iterating.
+As a workaround you'll need to delete keys following the completion of the iterator.
+
+```go
+var delkeys []string
+tx.AscendKeys("object:*", func(k, v string) bool {
+	if someCondition(k) == true {
+		delkeys = append(delkeys, k)
+	}
+	return true // continue
+})
+for _, k := range delkeys {
+	if _, err = tx.Delete(k); err != nil {
+		return err
+	}
+}
+```
+
 ## Append-only File
 
 BuntDB uses an AOF (append-only file) which is a log of all database changes that occur from operations like `Set()` and `Delete()`.
