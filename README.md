@@ -1,6 +1,6 @@
 <p align="center">
-<img 
-    src="logo.png" 
+<img
+    src="logo.png"
     width="307" height="150" border="0" alt="BuntDB">
 <br>
 <a href="https://travis-ci.org/tidwall/buntdb"><img src="https://img.shields.io/travis/tidwall/buntdb.svg?style=flat-square" alt="Build Status"></a>
@@ -9,10 +9,10 @@
 <a href="https://godoc.org/github.com/tidwall/buntdb"><img src="https://img.shields.io/badge/api-reference-blue.svg?style=flat-square" alt="GoDoc"></a>
 </p>
 
-BuntDB is a low-level, in-memory, key/value store in pure Go. 
+BuntDB is a low-level, in-memory, key/value store in pure Go.
 It persists to disk, is ACID compliant, and uses locking for multiple
-readers and a single writer. It supports custom indexes and geospatial 
-data. It's ideal for projects that need a dependable database and favor 
+readers and a single writer. It supports custom indexes and geospatial
+data. It's ideal for projects that need a dependable database and favor
 speed over data size.
 
 Features
@@ -49,27 +49,27 @@ This will retrieve the library.
 
 ## Opening a database
 
-The primary object in BuntDB is a `DB`. To open or create your 
+The primary object in BuntDB is a `DB`. To open or create your
 database, use the `buntdb.Open()` function:
 
 ```go
 package main
 
 import (
-	"log"
+  "log"
 
-	"github.com/tidwall/buntdb"
+  "github.com/tidwall/buntdb"
 )
 
 func main() {
-	// Open the data.db file. It will be created if it doesn't exist.
-	db, err := buntdb.Open("data.db")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-	
-	... 
+  // Open the data.db file. It will be created if it doesn't exist.
+  db, err := buntdb.Open("data.db")
+  if err != nil {
+  log.Fatal(err)
+  }
+  defer db.Close()
+
+  ...
 }
 ```
 
@@ -91,18 +91,18 @@ A read-only transaction should be used when you don't need to make changes to th
 
 ```go
 err := db.View(func(tx *buntdb.Tx) error {
-    ...
-    return nil
+  ...
+  return nil
 })
 ```
 
 ### Read/write Transactions
-A read/write transaction is used when you need to make changes to your data. There can only be one read/write transaction running at a time. So make sure you close it as soon as you are done with it. 
+A read/write transaction is used when you need to make changes to your data. There can only be one read/write transaction running at a time. So make sure you close it as soon as you are done with it.
 
 ```go
 err := db.Update(func(tx *buntdb.Tx) error {
-    ...
-    return nil
+  ...
+  return nil
 })
 ```
 
@@ -112,8 +112,8 @@ To set a value you must open a read/write transaction:
 
 ```go
 err := db.Update(func(tx *buntdb.Tx) error {
-    _, _, err := tx.Set("mykey", "myvalue", nil)
-    return err
+  _, _, err := tx.Set("mykey", "myvalue", nil)
+  return err
 })
 ```
 
@@ -122,26 +122,26 @@ To get the value:
 
 ```go
 err := db.View(func(tx *buntdb.Tx) error {
-    val, err := tx.Get("mykey") 
-    if err != nil{
-    	return err
-    }
-    fmt.Printf("value is %s\n", val) 
-    return nil
+  val, err := tx.Get("mykey")
+  if err != nil{
+    return err
+  }
+  fmt.Printf("value is %s\n", val)
+  return nil
 })
 ```
 
-Getting non-existent values will case an `ErrNotFound` error.
+Getting non-existent values will cause an `ErrNotFound` error.
 
 ### Iterating
 All keys/value pairs are ordered in the database by the key. To iterate over the keys:
 
 ```go
 err := db.View(func(tx *buntdb.Tx) error {
-err := tx.Ascend("", func(key, value string) bool{
-    	fmt.Printf("key: %s, value: %s\n", key, value)
-    })
-    return err
+  err := tx.Ascend("", func(key, value string) bool {
+    fmt.Printf("key: %s, value: %s\n", key, value)
+  })
+  return err
 })
 ```
 
@@ -168,13 +168,13 @@ Now you can add various names:
 ```go
 db.Update(func(tx *buntdb.Tx) error {
     tx.Set("user:0:name", "tom", nil)
-	tx.Set("user:1:name", "Randi", nil)
-	tx.Set("user:2:name", "jane", nil)
-	tx.Set("user:4:name", "Janet", nil)
-	tx.Set("user:5:name", "Paula", nil)
-	tx.Set("user:6:name", "peter", nil)
-	tx.Set("user:7:name", "Terri", nil)
-	return nil
+  tx.Set("user:1:name", "Randi", nil)
+  tx.Set("user:2:name", "jane", nil)
+  tx.Set("user:4:name", "Janet", nil)
+  tx.Set("user:5:name", "Paula", nil)
+  tx.Set("user:6:name", "peter", nil)
+  tx.Set("user:7:name", "Terri", nil)
+  return nil
 })
 ```
 
@@ -182,10 +182,10 @@ Finally you can iterate over the index:
 
 ```go
 db.View(func(tx *buntdb.Tx) error {
-	tx.Ascend("names", func(key, val string) bool {
-		fmt.Printf(buf, "%s %s\n", key, val)
-		return true
-	})
+  tx.Ascend("names", func(key, val string) bool {
+  fmt.Printf(buf, "%s %s\n", key, val)
+  return true
+  })
     return nil
 })
 ```
@@ -210,7 +210,7 @@ Now only items with keys that have the prefix `user:` will be added to the `name
 
 
 ### Built-in types
-Along with `IndexString`, there is also `IndexInt`, `IndexUint`, and `IndexFloat`. 
+Along with `IndexString`, there is also `IndexInt`, `IndexUint`, and `IndexFloat`.
 These are built-in types for indexing. You can choose to use these or create your own.
 
 So to create an index that is numerically ordered on an age key, we could use:
@@ -223,36 +223,36 @@ And then add values:
 
 ```go
 db.Update(func(tx *buntdb.Tx) error {
-    tx.Set("user:0:age", "35", nil)
-	tx.Set("user:1:age", "49", nil)
-	tx.Set("user:2:age", "13", nil)
-	tx.Set("user:4:age", "63", nil)
-	tx.Set("user:5:age", "8", nil)
-	tx.Set("user:6:age", "3", nil)
-	tx.Set("user:7:age", "16", nil)
-	return nil
+  tx.Set("user:0:age", "35", nil)
+  tx.Set("user:1:age", "49", nil)
+  tx.Set("user:2:age", "13", nil)
+  tx.Set("user:4:age", "63", nil)
+  tx.Set("user:5:age", "8", nil)
+  tx.Set("user:6:age", "3", nil)
+  tx.Set("user:7:age", "16", nil)
+  return nil
 })
 ```
 
 ```go
 db.View(func(tx *buntdb.Tx) error {
-	tx.Ascend("ages", func(key, val string) bool {
-		fmt.Printf(buf, "%s %s\n", key, val)
-		return true
-	})
+  tx.Ascend("ages", func(key, val string) bool {
+  fmt.Printf(buf, "%s %s\n", key, val)
+  return true
+  })
     return nil
 })
 ```
 
 The output should be:
 ```
-user:6:name 3
-user:5:name 8
-user:2:name 13
-user:7:name 16
-user:0:name 35
-user:1:name 49
-user:4:name 63
+user:6:age 3
+user:5:age 8
+user:2:age 13
+user:7:age 16
+user:0:age 35
+user:1:age 49
+user:4:age 63
 ```
 
 ## Spatial Indexes
@@ -270,10 +270,10 @@ To add some lon,lat points to the `fleet` index:
 
 ```go
 db.Update(func(tx *buntdb.Tx) error {
-    tx.Set("fleet:0:pos", "[-115.567 33.532]", nil)
-	tx.Set("fleet:1:pos", "[-116.671 35.735]", nil)
-	tx.Set("fleet:2:pos", "[-113.902 31.234]", nil)
-	return nil
+  tx.Set("fleet:0:pos", "[-115.567 33.532]", nil)
+  tx.Set("fleet:1:pos", "[-116.671 35.735]", nil)
+  tx.Set("fleet:2:pos", "[-113.902 31.234]", nil)
+  return nil
 })
 ```
 
@@ -282,8 +282,8 @@ And then you can run the `Intersects` function on the index:
 ```go
 db.View(func(tx *buntdb.Tx) error {
     tx.Intersects("fleet", "[-117 30],[-112 36]", func(key, val string) bool {
-    	...
-    	return true
+      ...
+      return true
     })
     return nil
 })
@@ -309,24 +309,24 @@ db.View(func(tx *buntdb.Tx) error {
 
 The bracket syntax `[-117 30],[-112 36]` is unique to BuntDB, and it's how the built-in rectangles are processed. But, you are not limited to this syntax. Whatever Rect function you choose to use during `CreateSpatialIndex` will be used to process the parameter, in this case it's `IndexRect`.
 
-- **2D rectangle:** `[10 15],[20 25]`  
+- **2D rectangle:** `[10 15],[20 25]`
 *Min XY: "10x15", Max XY: "20x25"*
 
-- **3D rectangle:** `[10 15 12],[20 25 18]`  
+- **3D rectangle:** `[10 15 12],[20 25 18]`
 *Min XYZ: "10x15x12", Max XYZ: "20x25x18"*
 
-- **2D point:** `[10 15]`  
+- **2D point:** `[10 15]`
 *XY: "10x15"*
 
-- **LatLon point:** `[-112.2693 33.5123]`  
+- **LonLat point:** `[-112.2693 33.5123]`
 *LatLon: "33.5123 -112.2693"*
 
-- **LatLon bounding box:** `[-112.26 33.51],[-112.18 33.67]`  
+- **LonLat bounding box:** `[-112.26 33.51],[-112.18 33.67]`
 *Min LatLon: "33.51 -112.26", Max LatLon: "33.67 -112.18"*
 
 **Notice:** The longitude is the Y axis and is on the left, and latitude is the X axis and is on the right.
 
-You can also represent `Infinity` by using `-inf` and `+inf`.  
+You can also represent `Infinity` by using `-inf` and `+inf`.
 For example, you might have the following points (`[X Y M]` where XY is a point and M is a timestamp):
 ```
 [3 9 1]
@@ -363,40 +363,40 @@ For example:
 package main
 
 import (
-	"fmt"
+  "fmt"
 
-	"github.com/tidwall/buntdb"
+  "github.com/tidwall/buntdb"
 )
 
 func main() {
-	db, _ := buntdb.Open(":memory:")
-	db.CreateIndex("last_name", "*", buntdb.IndexJSON("name.last"))
-	db.CreateIndex("age", "*", buntdb.IndexJSON("age"))
-	db.Update(func(tx *buntdb.Tx) error {
-		tx.Set("1", `{"name":{"first":"Tom","last":"Johnson"},"age":38}`, nil)
-		tx.Set("2", `{"name":{"first":"Janet","last":"Prichard"},"age":47}`, nil)
-		tx.Set("3", `{"name":{"first":"Carol","last":"Anderson"},"age":52}`, nil)
-		tx.Set("4", `{"name":{"first":"Alan","last":"Cooper"},"age":28}`, nil)
-		return nil
-	})
-	db.View(func(tx *buntdb.Tx) error {
-		fmt.Println("Order by last name")
-		tx.Ascend("last_name", func(key, value string) bool {
-			fmt.Printf("%s: %s\n", key, value)
-			return true
-		})
-		fmt.Println("Order by age")
-		tx.Ascend("age", func(key, value string) bool {
-			fmt.Printf("%s: %s\n", key, value)
-			return true
-		})
-		fmt.Println("Order by age range 30-50")
-		tx.AscendRange("age", `{"age":30}`, `{"age":50}`, func(key, value string) bool {
-			fmt.Printf("%s: %s\n", key, value)
-			return true
-		})
-		return nil
-	})
+  db, _ := buntdb.Open(":memory:")
+  db.CreateIndex("last_name", "*", buntdb.IndexJSON("name.last"))
+  db.CreateIndex("age", "*", buntdb.IndexJSON("age"))
+  db.Update(func(tx *buntdb.Tx) error {
+  tx.Set("1", `{"name":{"first":"Tom","last":"Johnson"},"age":38}`, nil)
+  tx.Set("2", `{"name":{"first":"Janet","last":"Prichard"},"age":47}`, nil)
+  tx.Set("3", `{"name":{"first":"Carol","last":"Anderson"},"age":52}`, nil)
+  tx.Set("4", `{"name":{"first":"Alan","last":"Cooper"},"age":28}`, nil)
+  return nil
+  })
+  db.View(func(tx *buntdb.Tx) error {
+  fmt.Println("Order by last name")
+  tx.Ascend("last_name", func(key, value string) bool {
+  fmt.Printf("%s: %s\n", key, value)
+  return true
+  })
+  fmt.Println("Order by age")
+  tx.Ascend("age", func(key, value string) bool {
+  fmt.Printf("%s: %s\n", key, value)
+  return true
+  })
+  fmt.Println("Order by age range 30-50")
+  tx.AscendRange("age", `{"age":30}`, `{"age":50}`, func(key, value string) bool {
+  fmt.Printf("%s: %s\n", key, value)
+  return true
+  })
+  return nil
+  })
 }
 ```
 
@@ -421,7 +421,7 @@ Order by age range 30-50
 ```
 
 ## Multi Value Index
-With BuntDB it's possible to join multiple values on a single index. 
+With BuntDB it's possible to join multiple values on a single index.
 This is similar to a [multi column index](http://dev.mysql.com/doc/refman/5.7/en/multiple-column-indexes.html) in a traditional SQL database.
 
 In this example we are creating a multi value index on "name.last" and "age":
@@ -430,20 +430,20 @@ In this example we are creating a multi value index on "name.last" and "age":
 db, _ := buntdb.Open(":memory:")
 db.CreateIndex("last_name_age", "*", buntdb.IndexJSON("name.last"), buntdb.IndexJSON("age"))
 db.Update(func(tx *buntdb.Tx) error {
-	tx.Set("1", `{"name":{"first":"Tom","last":"Johnson"},"age":38}`, nil)
-	tx.Set("2", `{"name":{"first":"Janet","last":"Prichard"},"age":47}`, nil)
-	tx.Set("3", `{"name":{"first":"Carol","last":"Anderson"},"age":52}`, nil)
-	tx.Set("4", `{"name":{"first":"Alan","last":"Cooper"},"age":28}`, nil)
-	tx.Set("5", `{"name":{"first":"Sam","last":"Anderson"},"age":51}`, nil)
-	tx.Set("6", `{"name":{"first":"Melinda","last":"Prichard"},"age":44}`, nil)
-	return nil
+  tx.Set("1", `{"name":{"first":"Tom","last":"Johnson"},"age":38}`, nil)
+  tx.Set("2", `{"name":{"first":"Janet","last":"Prichard"},"age":47}`, nil)
+  tx.Set("3", `{"name":{"first":"Carol","last":"Anderson"},"age":52}`, nil)
+  tx.Set("4", `{"name":{"first":"Alan","last":"Cooper"},"age":28}`, nil)
+  tx.Set("5", `{"name":{"first":"Sam","last":"Anderson"},"age":51}`, nil)
+  tx.Set("6", `{"name":{"first":"Melinda","last":"Prichard"},"age":44}`, nil)
+  return nil
 })
 db.View(func(tx *buntdb.Tx) error {
-	tx.Ascend("last_name_age", func(key, value string) bool {
-		fmt.Printf("%s: %s\n", key, value)
-		return true
-	})
-	return nil
+  tx.Ascend("last_name_age", func(key, value string) bool {
+  fmt.Printf("%s: %s\n", key, value)
+  return true
+  })
+  return nil
 })
 
 // Output:
@@ -459,9 +459,9 @@ db.View(func(tx *buntdb.Tx) error {
 Any index can be put in descending order by wrapping it's less function with `buntdb.Desc`.
 
 ```go
-db.CreateIndex("last_name_age", "*", 
-	buntdb.IndexJSON("name.last"), 
-	buntdb.Desc(buntdb.IndexJSON("age")))
+db.CreateIndex("last_name_age", "*",
+  buntdb.IndexJSON("name.last"),
+  buntdb.Desc(buntdb.IndexJSON("age")))
 ```
 
 This will create a multi value index where the last name is ascending and the age is descending.
@@ -485,9 +485,9 @@ import "github.com/tidwall/collate"
 // To sort case-insensitive in French.
 db.CreateIndex("name", "*", collate.IndexString("FRENCH_CI"))
 
-// To specify that numbers should sort numerically ("2" < "12") 
+// To specify that numbers should sort numerically ("2" < "12")
 // and use a comma to represent a decimal point.
-db.CreateIndex("amount", "*", collate.IndexString("FRENCH_NUM")) 
+db.CreateIndex("amount", "*", collate.IndexString("FRENCH_NUM"))
 ```
 
 There's also support for Collation on JSON indexes:
@@ -504,7 +504,7 @@ Items can be automatically evicted by using the `SetOptions` object in the `Set`
 ```go
 db.Update(func(tx *buntdb.Tx) error {
     tx.Set("mykey", "myval", &buntdb.SetOptions{Expires:true, TTL:time.Second})
-	return nil
+  return nil
 })
 ```
 
@@ -512,7 +512,7 @@ Now `mykey` will automatically be deleted after one second. You can remove the T
 
 ## Append-only File
 
-BuntDB uses an AOF (append-only file) which is a log of all database changes that occur from operations like `Set()` and `Delete()`. 
+BuntDB uses an AOF (append-only file) which is a log of all database changes that occur from operations like `Set()` and `Delete()`.
 
 The format of this file looks like:
 ```
@@ -542,7 +542,7 @@ The `Config.SyncPolicy` has the following options:
 - `EverySecond` - fsync every second, fast and safer, this is the default
 - `Always` - fsync after every write, very durable, slower
 
-## Config 
+## Config
 
 Here are some configuration options that can be use to change various behaviors of the database.
 
@@ -568,7 +568,7 @@ if err := db.WriteConfig(config); err != nil{
 
 How fast is BuntDB?
 
-Here are some example [benchmarks](https://github.com/tidwall/raft-buntdb#raftstore-performance-comparison) when using BuntDB in a Raft Store implementation. 
+Here are some example [benchmarks](https://github.com/tidwall/raft-buntdb#raftstore-performance-comparison) when using BuntDB in a Raft Store implementation.
 
 You can also run the standard Go benchmark tool from the project root directory:
 
