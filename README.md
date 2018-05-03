@@ -457,9 +457,9 @@ db.View(func(tx *buntdb.Tx) error {
 Any index can be put in descending order by wrapping it's less function with `buntdb.Desc`.
 
 ```go
-	db.CreateIndex("last_name_age", "*",
-	buntdb.IndexJSON("name.last"),
-	buntdb.Desc(buntdb.IndexJSON("age")))
+db.CreateIndex("last_name_age", "*",
+buntdb.IndexJSON("name.last"),
+buntdb.Desc(buntdb.IndexJSON("age")))
 ```
 
 This will create a multi value index where the last name is ascending and the age is descending.
