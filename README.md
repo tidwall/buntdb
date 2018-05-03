@@ -56,20 +56,20 @@ database, use the `buntdb.Open()` function:
 package main
 
 import (
-  "log"
+	"log"
 
-  "github.com/tidwall/buntdb"
+	"github.com/tidwall/buntdb"
 )
 
 func main() {
-  // Open the data.db file. It will be created if it doesn't exist.
-  db, err := buntdb.Open("data.db")
-  if err != nil {
-  log.Fatal(err)
-  }
-  defer db.Close()
+	// Open the data.db file. It will be created if it doesn't exist.
+	db, err := buntdb.Open("data.db")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
 
-  ...
+	...
 }
 ```
 
@@ -91,8 +91,8 @@ A read-only transaction should be used when you don't need to make changes to th
 
 ```go
 err := db.View(func(tx *buntdb.Tx) error {
-  ...
-  return nil
+	...
+	return nil
 })
 ```
 
@@ -101,8 +101,8 @@ A read/write transaction is used when you need to make changes to your data. The
 
 ```go
 err := db.Update(func(tx *buntdb.Tx) error {
-  ...
-  return nil
+	...
+	return nil
 })
 ```
 
@@ -112,8 +112,8 @@ To set a value you must open a read/write transaction:
 
 ```go
 err := db.Update(func(tx *buntdb.Tx) error {
-  _, _, err := tx.Set("mykey", "myvalue", nil)
-  return err
+	_, _, err := tx.Set("mykey", "myvalue", nil)
+	return err
 })
 ```
 
@@ -122,12 +122,12 @@ To get the value:
 
 ```go
 err := db.View(func(tx *buntdb.Tx) error {
-  val, err := tx.Get("mykey")
-  if err != nil{
-    return err
-  }
-  fmt.Printf("value is %s\n", val)
-  return nil
+	val, err := tx.Get("mykey")
+	if err != nil{
+		return err
+	}
+	fmt.Printf("value is %s\n", val)
+	return nil
 })
 ```
 
@@ -138,16 +138,14 @@ All keys/value pairs are ordered in the database by the key. To iterate over the
 
 ```go
 err := db.View(func(tx *buntdb.Tx) error {
-  err := tx.Ascend("", func(key, value string) bool {
-    fmt.Printf("key: %s, value: %s\n", key, value)
-  })
-  return err
+	err := tx.Ascend("", func(key, value string) bool {
+		fmt.Printf("key: %s, value: %s\n", key, value)
+	})
+	return err
 })
 ```
 
 There is also `AscendGreaterOrEqual`, `AscendLessThan`, `AscendRange`, `AscendEqual`, `Descend`, `DescendLessOrEqual`, `DescendGreaterThan`, `DescendRange`, and `DescendEqual`. Please see the [documentation](https://godoc.org/github.com/tidwall/buntdb) for more information on these functions.
-
-
 
 
 ## Custom Indexes
@@ -167,14 +165,14 @@ Now you can add various names:
 
 ```go
 db.Update(func(tx *buntdb.Tx) error {
-    tx.Set("user:0:name", "tom", nil)
-  tx.Set("user:1:name", "Randi", nil)
-  tx.Set("user:2:name", "jane", nil)
-  tx.Set("user:4:name", "Janet", nil)
-  tx.Set("user:5:name", "Paula", nil)
-  tx.Set("user:6:name", "peter", nil)
-  tx.Set("user:7:name", "Terri", nil)
-  return nil
+	tx.Set("user:0:name", "tom", nil)
+	tx.Set("user:1:name", "Randi", nil)
+	tx.Set("user:2:name", "jane", nil)
+	tx.Set("user:4:name", "Janet", nil)
+	tx.Set("user:5:name", "Paula", nil)
+	tx.Set("user:6:name", "peter", nil)
+	tx.Set("user:7:name", "Terri", nil)
+	return nil
 })
 ```
 
@@ -182,11 +180,11 @@ Finally you can iterate over the index:
 
 ```go
 db.View(func(tx *buntdb.Tx) error {
-  tx.Ascend("names", func(key, val string) bool {
-  fmt.Printf(buf, "%s %s\n", key, val)
-  return true
-  })
-    return nil
+	tx.Ascend("names", func(key, val string) bool {
+	fmt.Printf(buf, "%s %s\n", key, val)
+		return true
+	})
+	return nil
 })
 ```
 The output should be:
@@ -223,24 +221,24 @@ And then add values:
 
 ```go
 db.Update(func(tx *buntdb.Tx) error {
-  tx.Set("user:0:age", "35", nil)
-  tx.Set("user:1:age", "49", nil)
-  tx.Set("user:2:age", "13", nil)
-  tx.Set("user:4:age", "63", nil)
-  tx.Set("user:5:age", "8", nil)
-  tx.Set("user:6:age", "3", nil)
-  tx.Set("user:7:age", "16", nil)
-  return nil
+	tx.Set("user:0:age", "35", nil)
+	tx.Set("user:1:age", "49", nil)
+	tx.Set("user:2:age", "13", nil)
+	tx.Set("user:4:age", "63", nil)
+	tx.Set("user:5:age", "8", nil)
+	tx.Set("user:6:age", "3", nil)
+	tx.Set("user:7:age", "16", nil)
+	return nil
 })
 ```
 
 ```go
 db.View(func(tx *buntdb.Tx) error {
-  tx.Ascend("ages", func(key, val string) bool {
-  fmt.Printf(buf, "%s %s\n", key, val)
-  return true
-  })
-    return nil
+	tx.Ascend("ages", func(key, val string) bool {
+	fmt.Printf(buf, "%s %s\n", key, val)
+		return true
+	})
+	return nil
 })
 ```
 
@@ -270,10 +268,10 @@ To add some lon,lat points to the `fleet` index:
 
 ```go
 db.Update(func(tx *buntdb.Tx) error {
-  tx.Set("fleet:0:pos", "[-115.567 33.532]", nil)
-  tx.Set("fleet:1:pos", "[-116.671 35.735]", nil)
-  tx.Set("fleet:2:pos", "[-113.902 31.234]", nil)
-  return nil
+	tx.Set("fleet:0:pos", "[-115.567 33.532]", nil)
+	tx.Set("fleet:1:pos", "[-116.671 35.735]", nil)
+	tx.Set("fleet:2:pos", "[-113.902 31.234]", nil)
+	return nil
 })
 ```
 
@@ -281,11 +279,11 @@ And then you can run the `Intersects` function on the index:
 
 ```go
 db.View(func(tx *buntdb.Tx) error {
-    tx.Intersects("fleet", "[-117 30],[-112 36]", func(key, val string) bool {
-      ...
-      return true
-    })
-    return nil
+	tx.Intersects("fleet", "[-117 30],[-112 36]", func(key, val string) bool {
+		...
+		return true
+	})
+	return nil
 })
 ```
 
@@ -297,11 +295,11 @@ Use the `Nearby` function to get all the positions in order of nearest to farthe
 
 ```go
 db.View(func(tx *buntdb.Tx) error {
-    tx.Nearby("fleet", "[-113 33]", func(key, val string, dist float64) bool {
-    	...
-    	return true
-    })
-    return nil
+	tx.Nearby("fleet", "[-113 33]", func(key, val string, dist float64) bool {
+		...
+		return true
+	})
+	return nil
 })
 ```
 
@@ -341,8 +339,8 @@ You can then do a search for all points with `M` between 2-4 by calling `Interse
 
 ```go
 tx.Intersects("points", "[-inf -inf 2],[+inf +inf 4]", func(key, val string) bool {
-    println(val)
-    return true
+	println(val)
+	return true
 })
 ```
 
@@ -363,40 +361,40 @@ For example:
 package main
 
 import (
-  "fmt"
+	"fmt"
 
-  "github.com/tidwall/buntdb"
+	"github.com/tidwall/buntdb"
 )
 
 func main() {
-  db, _ := buntdb.Open(":memory:")
-  db.CreateIndex("last_name", "*", buntdb.IndexJSON("name.last"))
-  db.CreateIndex("age", "*", buntdb.IndexJSON("age"))
-  db.Update(func(tx *buntdb.Tx) error {
-  tx.Set("1", `{"name":{"first":"Tom","last":"Johnson"},"age":38}`, nil)
-  tx.Set("2", `{"name":{"first":"Janet","last":"Prichard"},"age":47}`, nil)
-  tx.Set("3", `{"name":{"first":"Carol","last":"Anderson"},"age":52}`, nil)
-  tx.Set("4", `{"name":{"first":"Alan","last":"Cooper"},"age":28}`, nil)
-  return nil
-  })
-  db.View(func(tx *buntdb.Tx) error {
-  fmt.Println("Order by last name")
-  tx.Ascend("last_name", func(key, value string) bool {
-  fmt.Printf("%s: %s\n", key, value)
-  return true
-  })
-  fmt.Println("Order by age")
-  tx.Ascend("age", func(key, value string) bool {
-  fmt.Printf("%s: %s\n", key, value)
-  return true
-  })
-  fmt.Println("Order by age range 30-50")
-  tx.AscendRange("age", `{"age":30}`, `{"age":50}`, func(key, value string) bool {
-  fmt.Printf("%s: %s\n", key, value)
-  return true
-  })
-  return nil
-  })
+	db, _ := buntdb.Open(":memory:")
+	db.CreateIndex("last_name", "*", buntdb.IndexJSON("name.last"))
+	db.CreateIndex("age", "*", buntdb.IndexJSON("age"))
+	db.Update(func(tx *buntdb.Tx) error {
+		tx.Set("1", `{"name":{"first":"Tom","last":"Johnson"},"age":38}`, nil)
+		tx.Set("2", `{"name":{"first":"Janet","last":"Prichard"},"age":47}`, nil)
+		tx.Set("3", `{"name":{"first":"Carol","last":"Anderson"},"age":52}`, nil)
+		tx.Set("4", `{"name":{"first":"Alan","last":"Cooper"},"age":28}`, nil)
+		return nil
+	})
+	db.View(func(tx *buntdb.Tx) error {
+		fmt.Println("Order by last name")
+		tx.Ascend("last_name", func(key, value string) bool {
+			fmt.Printf("%s: %s\n", key, value)
+			return true
+		})
+		fmt.Println("Order by age")
+		tx.Ascend("age", func(key, value string) bool {
+			fmt.Printf("%s: %s\n", key, value)
+			return true
+		})
+		fmt.Println("Order by age range 30-50")
+		tx.AscendRange("age", `{"age":30}`, `{"age":50}`, func(key, value string) bool {
+			fmt.Printf("%s: %s\n", key, value)
+			return true
+		})
+		return nil
+	})
 }
 ```
 
@@ -430,20 +428,20 @@ In this example we are creating a multi value index on "name.last" and "age":
 db, _ := buntdb.Open(":memory:")
 db.CreateIndex("last_name_age", "*", buntdb.IndexJSON("name.last"), buntdb.IndexJSON("age"))
 db.Update(func(tx *buntdb.Tx) error {
-  tx.Set("1", `{"name":{"first":"Tom","last":"Johnson"},"age":38}`, nil)
-  tx.Set("2", `{"name":{"first":"Janet","last":"Prichard"},"age":47}`, nil)
-  tx.Set("3", `{"name":{"first":"Carol","last":"Anderson"},"age":52}`, nil)
-  tx.Set("4", `{"name":{"first":"Alan","last":"Cooper"},"age":28}`, nil)
-  tx.Set("5", `{"name":{"first":"Sam","last":"Anderson"},"age":51}`, nil)
-  tx.Set("6", `{"name":{"first":"Melinda","last":"Prichard"},"age":44}`, nil)
-  return nil
+	tx.Set("1", `{"name":{"first":"Tom","last":"Johnson"},"age":38}`, nil)
+	tx.Set("2", `{"name":{"first":"Janet","last":"Prichard"},"age":47}`, nil)
+	tx.Set("3", `{"name":{"first":"Carol","last":"Anderson"},"age":52}`, nil)
+	tx.Set("4", `{"name":{"first":"Alan","last":"Cooper"},"age":28}`, nil)
+	tx.Set("5", `{"name":{"first":"Sam","last":"Anderson"},"age":51}`, nil)
+	tx.Set("6", `{"name":{"first":"Melinda","last":"Prichard"},"age":44}`, nil)
+	return nil
 })
 db.View(func(tx *buntdb.Tx) error {
-  tx.Ascend("last_name_age", func(key, value string) bool {
-  fmt.Printf("%s: %s\n", key, value)
-  return true
-  })
-  return nil
+	tx.Ascend("last_name_age", func(key, value string) bool {
+		fmt.Printf("%s: %s\n", key, value)
+		return true
+	})
+	return nil
 })
 
 // Output:
@@ -459,9 +457,9 @@ db.View(func(tx *buntdb.Tx) error {
 Any index can be put in descending order by wrapping it's less function with `buntdb.Desc`.
 
 ```go
-db.CreateIndex("last_name_age", "*",
-  buntdb.IndexJSON("name.last"),
-  buntdb.Desc(buntdb.IndexJSON("age")))
+	db.CreateIndex("last_name_age", "*",
+	buntdb.IndexJSON("name.last"),
+	buntdb.Desc(buntdb.IndexJSON("age")))
 ```
 
 This will create a multi value index where the last name is ascending and the age is descending.
@@ -503,8 +501,8 @@ Items can be automatically evicted by using the `SetOptions` object in the `Set`
 
 ```go
 db.Update(func(tx *buntdb.Tx) error {
-    tx.Set("mykey", "myval", &buntdb.SetOptions{Expires:true, TTL:time.Second})
-  return nil
+	tx.Set("mykey", "myval", &buntdb.SetOptions{Expires:true, TTL:time.Second})
+	return nil
 })
 ```
 
@@ -576,10 +574,10 @@ To update the configuration you should call `ReadConfig` followed by `SetConfig`
 
 var config buntdb.Config
 if err := db.ReadConfig(&config); err != nil{
-    log.Fatal(err)
+	log.Fatal(err)
 }
 if err := db.WriteConfig(config); err != nil{
-    log.Fatal(err)
+	log.Fatal(err)
 }
 ```
 
