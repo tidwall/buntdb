@@ -262,12 +262,7 @@ func (idx *index) match(key string) bool {
 		return true
 	}
 	if idx.opts.CaseInsensitiveKeyMatching {
-		for i := 0; i < len(key); i++ {
-			if key[i] >= 'A' && key[i] <= 'Z' {
-				key = strings.ToLower(key)
-				break
-			}
-		}
+		key = strings.ToLower(key)
 	}
 	return match.Match(key, idx.pattern)
 }
