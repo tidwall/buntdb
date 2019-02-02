@@ -224,7 +224,7 @@ func (db *DB) Save(wr io.Writer) error {
 	if len(buf) > 0 {
 		_, err = wr.Write(buf)
 	}
-	return nil
+	return err
 }
 
 // Load loads commands from reader. This operation blocks all reads and writes.
