@@ -223,9 +223,6 @@ func (db *DB) Save(wr io.Writer) error {
 	// one final flush
 	if len(buf) > 0 {
 		_, err = wr.Write(buf)
-		if err != nil {
-			return err
-		}
 	}
 	return nil
 }
