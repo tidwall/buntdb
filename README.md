@@ -576,7 +576,7 @@ var config buntdb.Config
 if err := db.ReadConfig(&config); err != nil{
 	log.Fatal(err)
 }
-if err := db.WriteConfig(config); err != nil{
+if err := db.SetConfig(config); err != nil{
 	log.Fatal(err)
 }
 ```
