@@ -334,8 +334,6 @@ func (idx *index) rebuild() {
 // less function to handle the content format and comparison.
 // There are some default less function that can be used such as
 // IndexString, IndexBinary, etc.
-//
-// Deprecated: Use Transactions
 func (db *DB) CreateIndex(name, pattern string,
 	less ...func(a, b string) bool) error {
 	return db.Update(func(tx *Tx) error {
@@ -347,8 +345,6 @@ func (db *DB) CreateIndex(name, pattern string,
 // The items are ordered in an b-tree and can be retrieved using the
 // Ascend* and Descend* methods.
 // If a previous index with the same name exists, that index will be deleted.
-//
-// Deprecated: Use Transactions
 func (db *DB) ReplaceIndex(name, pattern string,
 	less ...func(a, b string) bool) error {
 	return db.Update(func(tx *Tx) error {
@@ -381,8 +377,6 @@ func (db *DB) ReplaceIndex(name, pattern string,
 // Thus min[0] must be less-than-or-equal-to max[0].
 // The IndexRect is a default function that can be used for the rect
 // parameter.
-//
-// Deprecated: Use Transactions
 func (db *DB) CreateSpatialIndex(name, pattern string,
 	rect func(item string) (min, max []float64)) error {
 	return db.Update(func(tx *Tx) error {
@@ -394,8 +388,6 @@ func (db *DB) CreateSpatialIndex(name, pattern string,
 // The items are organized in an r-tree and can be retrieved using the
 // Intersects method.
 // If a previous index with the same name exists, that index will be deleted.
-//
-// Deprecated: Use Transactions
 func (db *DB) ReplaceSpatialIndex(name, pattern string,
 	rect func(item string) (min, max []float64)) error {
 	return db.Update(func(tx *Tx) error {
@@ -415,8 +407,6 @@ func (db *DB) ReplaceSpatialIndex(name, pattern string,
 }
 
 // DropIndex removes an index.
-//
-// Deprecated: Use Transactions
 func (db *DB) DropIndex(name string) error {
 	return db.Update(func(tx *Tx) error {
 		return tx.DropIndex(name)
@@ -424,8 +414,6 @@ func (db *DB) DropIndex(name string) error {
 }
 
 // Indexes returns a list of index names.
-//
-// Deprecated: Use Transactions
 func (db *DB) Indexes() ([]string, error) {
 	var names []string
 	var err = db.View(func(tx *Tx) error {
