@@ -306,7 +306,7 @@ func (idx *index) rebuild() {
 	idx.db.keys.Ascend(func(item btree.Item) bool {
 		dbi := item.(*dbItem)
 		if !idx.match(dbi.key) {
-			// does not match the pattern, conintue
+			// does not match the pattern, continue
 			return true
 		}
 		if idx.less != nil {
@@ -849,7 +849,7 @@ func (db *DB) readLoad(rd io.Reader, modTime time.Time) error {
 		if len(parts) == 0 {
 			continue
 		}
-		if (parts[0][0] == 's' || parts[0][1] == 'S') &&
+		if (parts[0][0] == 's' || parts[0][0] == 'S') &&
 			(parts[0][1] == 'e' || parts[0][1] == 'E') &&
 			(parts[0][2] == 't' || parts[0][2] == 'T') {
 			// SET
@@ -879,7 +879,7 @@ func (db *DB) readLoad(rd io.Reader, modTime time.Time) error {
 			} else {
 				db.insertIntoDatabase(&dbItem{key: parts[1], val: parts[2]})
 			}
-		} else if (parts[0][0] == 'd' || parts[0][1] == 'D') &&
+		} else if (parts[0][0] == 'd' || parts[0][0] == 'D') &&
 			(parts[0][1] == 'e' || parts[0][1] == 'E') &&
 			(parts[0][2] == 'l' || parts[0][2] == 'L') {
 			// DEL
@@ -887,7 +887,7 @@ func (db *DB) readLoad(rd io.Reader, modTime time.Time) error {
 				return ErrInvalid
 			}
 			db.deleteFromDatabase(&dbItem{key: parts[1]})
-		} else if (parts[0][0] == 'f' || parts[0][1] == 'F') &&
+		} else if (parts[0][0] == 'f' || parts[0][0] == 'F') &&
 			strings.ToLower(parts[0]) == "flushdb" {
 			db.keys = btree.New(btreeDegrees, nil)
 			db.exps = btree.New(btreeDegrees, &exctx{db})
