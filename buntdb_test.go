@@ -2646,3 +2646,11 @@ OUTER1:
 		t.Fail()
 	}
 }
+
+func TestErrorType(t *testing.T) {
+	e := err("failed")
+
+	if e.Error() != "failed" {
+		t.Errorf("expected %s, got %v", "failed", e)
+	}
+}

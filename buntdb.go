@@ -22,42 +22,49 @@ import (
 	"github.com/tidwall/rtree"
 )
 
-var (
+// err it is a simple error type.
+type err string
+
+func (e err) Error() string {
+	return string(e)
+}
+
+const (
 	// ErrTxNotWritable is returned when performing a write operation on a
 	// read-only transaction.
-	ErrTxNotWritable = errors.New("tx not writable")
+	ErrTxNotWritable = err("tx not writable")
 
 	// ErrTxClosed is returned when committing or rolling back a transaction
 	// that has already been committed or rolled back.
-	ErrTxClosed = errors.New("tx closed")
+	ErrTxClosed = err("tx closed")
 
 	// ErrNotFound is returned when an item or index is not in the database.
-	ErrNotFound = errors.New("not found")
+	ErrNotFound = err("not found")
 
 	// ErrInvalid is returned when the database file is an invalid format.
-	ErrInvalid = errors.New("invalid database")
+	ErrInvalid = err("invalid database")
 
 	// ErrDatabaseClosed is returned when the database is closed.
-	ErrDatabaseClosed = errors.New("database closed")
+	ErrDatabaseClosed = err("database closed")
 
 	// ErrIndexExists is returned when an index already exists in the database.
-	ErrIndexExists = errors.New("index exists")
+	ErrIndexExists = err("index exists")
 
 	// ErrInvalidOperation is returned when an operation cannot be completed.
-	ErrInvalidOperation = errors.New("invalid operation")
+	ErrInvalidOperation = err("invalid operation")
 
 	// ErrInvalidSyncPolicy is returned for an invalid SyncPolicy value.
-	ErrInvalidSyncPolicy = errors.New("invalid sync policy")
+	ErrInvalidSyncPolicy = err("invalid sync policy")
 
 	// ErrShrinkInProcess is returned when a shrink operation is in-process.
-	ErrShrinkInProcess = errors.New("shrink is in-process")
+	ErrShrinkInProcess = err("shrink is in-process")
 
 	// ErrPersistenceActive is returned when post-loading data from an database
 	// not opened with Open(":memory:").
-	ErrPersistenceActive = errors.New("persistence active")
+	ErrPersistenceActive = err("persistence active")
 
 	// ErrTxIterating is returned when Set or Delete are called while iterating.
-	ErrTxIterating = errors.New("tx is iterating")
+	ErrTxIterating = err("tx is iterating")
 )
 
 // DB represents a collection of key-value pairs that persist on disk.
