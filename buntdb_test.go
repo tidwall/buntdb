@@ -1101,25 +1101,26 @@ func Example_descKeys() {
 			})
 		return nil
 	})
+
 	// Output:
-	//user:101:first: Janet
-	//user:101:last: Prichard
-	//user:100:first: Tom
-	//user:100:last: Johnson
-	//user:101:first: Janet
-	//user:101:last: Prichard
-	//user:102:first: Alan
-	//user:102:last: Cooper
-	//user:102:first: Alan
-	//user:102:last: Cooper
-	//user:101:last: Prichard
-	//user:101:first: Janet
-	//user:102:last: Cooper
-	//user:102:first: Alan
-	//user:101:last: Prichard
-	//user:101:first: Janet
-	//user:100:last: Johnson
-	//user:100:first: Tom
+	// user:101:first: Janet
+	// user:101:last: Prichard
+	// user:100:first: Tom
+	// user:100:last: Johnson
+	// user:101:first: Janet
+	// user:101:last: Prichard
+	// user:102:first: Alan
+	// user:102:last: Cooper
+	// user:102:first: Alan
+	// user:102:last: Cooper
+	// user:101:last: Prichard
+	// user:101:first: Janet
+	// user:102:last: Cooper
+	// user:102:first: Alan
+	// user:101:last: Prichard
+	// user:101:first: Janet
+	// user:100:last: Johnson
+	// user:100:first: Tom
 }
 
 func ExampleDesc() {
