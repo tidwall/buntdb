@@ -1,5 +1,11 @@
 github.com/tidwall/btree v0.0.0-20191029221954-400434d76274 h1:G6Z6HvJuPjG6XfNGi/feOATzeJrfgTNJY+rGrHbA04E=
 github.com/tidwall/btree v0.0.0-20191029221954-400434d76274/go.mod h1:huei1BkDWJ3/sLXmO+bsCNELL+Bp2Kks9OLyQFkzvA8=
+github.com/tidwall/btree v0.1.0 h1:08K82J5GUBN+zdEE8/xWaBgU6+yYWW995LhHFEl8dzI=
+github.com/tidwall/btree v0.1.0/go.mod h1:huei1BkDWJ3/sLXmO+bsCNELL+Bp2Kks9OLyQFkzvA8=
+github.com/tidwall/btree v0.2.0 h1:+x3HF7KQ4uarFfyQpAViE+R3ip/zIjASmAC54ocDNng=
+github.com/tidwall/btree v0.2.0/go.mod h1:huei1BkDWJ3/sLXmO+bsCNELL+Bp2Kks9OLyQFkzvA8=
+github.com/tidwall/btree v0.2.1 h1:jToKrG8o1uRsYRr07sTpLyiP4deacqJetUk/+WI7H94=
+github.com/tidwall/btree v0.2.1/go.mod h1:huei1BkDWJ3/sLXmO+bsCNELL+Bp2Kks9OLyQFkzvA8=
 github.com/tidwall/gjson v1.3.4 h1:On5waDnyKKk3SWE4EthbjjirAWXp43xx5cKCUZY1eZw=
 github.com/tidwall/gjson v1.3.4/go.mod h1:P256ACg0Mn+j1RXIDXoss50DeIABTYK1PULOJHhxOls=
 github.com/tidwall/grect v0.0.0-20161006141115-ba9a043346eb h1:5NSYaAdrnblKByzd7XByQEJVT8+9v0W/tIY0Oo4OwrE=
