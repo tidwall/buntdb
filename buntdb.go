@@ -861,7 +861,7 @@ func (db *DB) readLoad(rd io.Reader, modTime time.Time) error {
 				if strings.ToLower(parts[3]) != "ex" {
 					return ErrInvalid
 				}
-				ex, err := strconv.ParseInt(parts[4], 10, 64)
+				ex, err := strconv.ParseUint(parts[4], 10, 64)
 				if err != nil {
 					return err
 				}
