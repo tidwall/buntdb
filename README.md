@@ -3,8 +3,6 @@
     src="logo.png"
     width="307" height="150" border="0" alt="BuntDB">
 <br>
-<a href="http://gocover.io/github.com/tidwall/buntdb"><img src="https://img.shields.io/badge/coverage-95%25-brightgreen.svg?style=flat-square" alt="Code Coverage"></a>
-<a href="https://goreportcard.com/report/github.com/tidwall/buntdb"><img src="https://goreportcard.com/badge/github.com/tidwall/buntdb?style=flat-square" alt="Go Report Card"></a>
 <a href="https://godoc.org/github.com/tidwall/buntdb"><img src="https://img.shields.io/badge/api-reference-blue.svg?style=flat-square" alt="GoDoc"></a>
 </p>
 
