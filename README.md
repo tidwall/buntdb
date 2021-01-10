@@ -3,7 +3,7 @@
     src="logo.png"
     width="307" height="150" border="0" alt="BuntDB">
 <br>
-<a href="https://goreportcard.com/badge/github.com/tidwall/untdb?style=flat-square"><img src="https://goreportcard.com/badge/github.com/tidwall/buntdb?style=flat-square" alt="Go Report Card"></a>
+<a href="https://goreportcard.com/report/github.com/tidwall/buntdb"><img src="https://goreportcard.com/badge/github.com/tidwall/buntdb?style=flat-square" alt="Go Report Card"></a>
 <a href="https://godoc.org/github.com/tidwall/buntdb"><img src="https://img.shields.io/badge/go-documentation-blue.svg?style=flat-square" alt="Godoc"></a>
 <a href="https://github.com/etcd-io/tidwall/buntdb/master/LICENSE"><img src="https://img.shields.io/github/license/tidwall/buntdb.svg?style=flat-square" alt="LICENSE"></a>
 </p>
