@@ -2647,3 +2647,84 @@ OUTER1:
 		t.Fail()
 	}
 }
+
+func TestTransactionLeak(t *testing.T) {
+	// This tests an bug identified in Issue #69. When inside a Update
+	// transaction, a Set after a Delete for a key that previously exists will
+	// remove the key when the transaction was rolledback.
+	buntDB, err := Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bd := buntDB
+	err = bd.Update(func(tx *Tx) error {
+		_, _, err := tx.Set("a", "a", nil)
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bd.View(func(tx *Tx) error {
+		val, err := tx.Get("a")
+		if err != nil {
+			return err
+		}
+		if val != "a" {
+			return errors.New("mismatch")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bd.Update(func(tx *Tx) error {
+		val, err := tx.Delete("a")
+		if err != nil {
+			return err
+		}
+		if val != "a" {
+			return errors.New("mismatch")
+		}
+		val, err = tx.Get("a")
+		if err != ErrNotFound {
+			return fmt.Errorf("expected NotFound, got %v", err)
+		}
+		if val != "" {
+			return errors.New("mismatch")
+		}
+		val, rep, err := tx.Set("a", "b", nil)
+		if err != nil {
+			return err
+		}
+		if rep {
+			return errors.New("replaced")
+		}
+		if val != "" {
+			return errors.New("mismatch")
+		}
+		val, err = tx.Get("a")
+		if err != nil {
+			return err
+		}
+		if val != "b" {
+			return errors.New("mismatch")
+		}
+		return errors.New("rollback")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bd.View(func(tx *Tx) error {
+		val, err := tx.Get("a")
+		if err != nil {
+			return err
+		}
+		if val != "a" {
+			return errors.New("mismatch")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
