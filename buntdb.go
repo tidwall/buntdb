@@ -1390,7 +1390,9 @@ func (tx *Tx) Set(key, value string, opts *SetOptions) (previousValue string,
 			// create a rollback entry with a nil value. A nil value indicates
 			// that the entry should be deleted on rollback. When the value is
 			// *not* nil, that means the entry should be reverted.
-			tx.wc.rollbackItems[key] = nil
+			if _, ok := tx.wc.rollbackItems[key]; !ok {
+				tx.wc.rollbackItems[key] = nil
+			}
 		} else {
 			// A previous item already exists in the database. Let's create a
 			// rollback entry with the item as the value. We need to check the
