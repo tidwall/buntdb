@@ -1362,44 +1362,86 @@ func TestDatabaseFormat(t *testing.T) {
 		db := testOpen(t)
 		defer testClose(db)
 	}()
-	testBadFormat := func(resp string) {
-		if err := os.RemoveAll("data.db"); err != nil {
-			t.Fatal(err)
-		}
+	testFormat := func(t *testing.T, expectValid bool, resp string, do func(db *DB) error) {
+		t.Helper()
+		os.RemoveAll("data.db")
 		if err := ioutil.WriteFile("data.db", []byte(resp), 0666); err != nil {
 			t.Fatal(err)
 		}
+		defer os.RemoveAll("data.db")
+
 		db, err := Open("data.db")
 		if err == nil {
+			if do != nil {
+				if err := do(db); err != nil {
+					t.Fatal(err)
+				}
+			}
 			if err := db.Close(); err != nil {
 				t.Fatal(err)
 			}
-			if err := os.RemoveAll("data.db"); err != nil {
-				t.Fatal(err)
-			}
-			t.Fatalf("invalid database should not be allowed")
+		}
+		if err == nil && !expectValid {
+			t.Fatalf("expected invalid database")
+		} else if err != nil && expectValid {
+			t.Fatalf("expected valid database, got '%s'", err)
 		}
 	}
-	testBadFormat("*3\r")
-	testBadFormat("*3\n")
-	testBadFormat("*a\r\n")
-	testBadFormat("*2\r\n")
-	testBadFormat("*2\r\n%3")
-	testBadFormat("*2\r\n$")
-	testBadFormat("*2\r\n$3\r\n")
-	testBadFormat("*2\r\n$3\r\ndel")
-	testBadFormat("*2\r\n$3\r\ndel\r\r")
-	testBadFormat("*0\r\n*2\r\n$3\r\ndel\r\r")
-	testBadFormat("*1\r\n$3\r\nnop\r\n")
-	testBadFormat("*1\r\n$3\r\ndel\r\n")
-	testBadFormat("*1\r\n$3\r\nset\r\n")
-	testBadFormat("*5\r\n$3\r\nset\r\n$3\r\nvar\r\n$3\r\nval\r\n$2\r\nxx\r\n$2\r\n10\r\n")
-	testBadFormat("*5\r\n$3\r\nset\r\n$3\r\nvar\r\n$3\r\nval\r\n$2\r\nex\r\n$2\r\naa\r\n")
-	testBadFormat("*15\r\n$3\r\nset\r\n$3\r\nvar\r\n$3\r\nval\r\n$2\r\nex\r\n$2\r\naa\r\n")
-	testBadFormat("*1A\r\n$3\r\nset\r\n$3\r\nvar\r\n$3\r\nval\r\n$2\r\nex\r\n$2\r\naa\r\n")
-	testBadFormat("*5\r\n$13\r\nset\r\n$3\r\nvar\r\n$3\r\nval\r\n$2\r\nex\r\n$2\r\naa\r\n")
-	testBadFormat("*5\r\n$1A\r\nset\r\n$3\r\nvar\r\n$3\r\nval\r\n$2\r\nex\r\n$2\r\naa\r\n")
-	testBadFormat("*5\r\n$3\r\nset\r\n$5000\r\nvar\r\n$3\r\nval\r\n$2\r\nex\r\n$2\r\naa\r\n")
+
+	// basic valid commands
+	testFormat(t, true, "*2\r\n$3\r\nDEL\r\n$5\r\nHELLO\r\n", nil)
+	testFormat(t, true, "*3\r\n$3\r\nSET\r\n$5\r\nHELLO\r\n$5\r\nWORLD\r\n", nil)
+	testFormat(t, true, "*1\r\n$7\r\nFLUSHDB\r\n", nil)
+
+	// commands with invalid names or arguments
+	testFormat(t, false, "*3\r\n$3\r\nDEL\r\n$5\r\nHELLO\r\n$5\r\nWORLD\r\n", nil)
+	testFormat(t, false, "*2\r\n$3\r\nSET\r\n$5\r\nHELLO\r\n", nil)
+	testFormat(t, false, "*1\r\n$6\r\nSET123\r\n", nil)
+
+	// partial tail commands should be ignored but allowed
+	pcmd := "*3\r\n$3\r\nSET\r\n$5\r\nHELLO\r\n$5\r\nWORLD\r\n"
+	for i := 1; i < len(pcmd); i++ {
+		cmd := "*3\r\n$3\r\nSET\r\n$5\r\nHELLO\r\n$5\r\nJELLO\r\n"
+		testFormat(t, true, cmd+pcmd[:len(pcmd)-i],
+			func(db *DB) error {
+				return db.View(func(tx *Tx) error {
+					val, err := tx.Get("HELLO")
+					if err != nil {
+						return err
+					}
+					if val != "JELLO" {
+						return fmt.Errorf("expected '%s', got '%s'", "JELLO", val)
+					}
+					return nil
+				})
+			})
+	}
+
+	// commands with invalid formatting
+	testFormat(t, false, "^3\r\n$3\r\nSET\r\n$5\r\nHELLO\r\n$5\r\nWORLD\r\n", nil)
+	testFormat(t, false, "*3\n$3\r\nSET\r\n$5\r\nHELLO\r\n$5\r\nWORLD\r\n", nil)
+	testFormat(t, false, "*\n$3\r\nSET\r\n$5\r\nHELLO\r\n$5\r\nWORLD\r\n", nil)
+	testFormat(t, false, "*3\r\n^3\r\nSET\r\n$5\r\nHELLO\r\n$5\r\nWORLD\r\n", nil)
+	testFormat(t, false, "*3\r\n$\r\nSET\r\n$5\r\nHELLO\r\n$5\r\nWORLD\r\n", nil)
+	testFormat(t, false, "*3\r\n$3\nSET\r\n$5\r\nHELLO\r\n$5\r\nWORLD\r\n", nil)
+	testFormat(t, false, "*3\r\n$3SET\r\n$5\r\nHELLO\r\n$5\r\nWORLD\r\n", nil)
+	testFormat(t, false, "*3\r\n$3\r\nSET\r\n$5\r\nHELLO\r\n$5\r\nWORLD\r\n123\n", nil)
+
+	// commands with nuls
+	testFormat(t, true, "\u0000*3\r\n$3\r\nSET\r\n$5\r\nHELLO\r\n$5\r\nWORLD\r\n"+
+		"\u0000\u0000*3\r\n$3\r\nSET\r\n$5\r\nHELLO\r\n$5\r\nJELLO\r\n\u0000", func(db *DB) error {
+		return db.View(func(tx *Tx) error {
+			val, err := tx.Get("HELLO")
+			if err != nil {
+				return err
+			}
+			if val != "JELLO" {
+				return fmt.Errorf("expected '%s', got '%s'", "JELLO", val)
+			}
+			return nil
+		})
+	})
+
 }
 
 func TestInsertsAndDeleted(t *testing.T) {
@@ -1812,7 +1854,7 @@ func TestBasic(t *testing.T) {
 			t.Fatal(err)
 		}
 		if false {
-			println(time.Now().Sub(start).String(), db.keys.Len())
+			println(time.Since(start).String(), db.keys.Len())
 		}
 		// add some random rects
 		if err := db.Update(func(tx *Tx) error {
@@ -1862,6 +1904,9 @@ func TestBasic(t *testing.T) {
 			fmt.Fprintf(buf, "%s: %v,%v\n", key, min, max)
 			return true
 		})
+		if err != nil {
+			t.Fatal(err)
+		}
 		expect := make([]string, 2)
 		n := 0
 		err = tx.Intersects("rects", "[0 0],[15 15]", func(key, val string) bool {
