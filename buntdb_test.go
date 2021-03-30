@@ -12,6 +12,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/tidwall/lotsa"
 )
 
 func testOpen(t testing.TB) *DB {
@@ -2771,5 +2773,60 @@ func TestTransactionLeak(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestReloadNotInvalid(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
+	os.RemoveAll("data.db")
+	defer os.RemoveAll("data.db")
+	start := time.Now()
+	ii := 0
+	for time.Since(start) < time.Second*5 {
+		func() {
+			db, err := Open("data.db")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() {
+				if err := db.Close(); err != nil {
+					panic(err)
+				}
+				// truncate at a random point in the file
+				f, err := os.OpenFile("data.db", os.O_RDWR, 0666)
+				if err != nil {
+					panic(err)
+				}
+				defer f.Close()
+				sz, err := f.Seek(0, 2)
+				if err != nil {
+					panic(err)
+				}
+				n := sz/2 + int64(rand.Intn(int(sz/2)))
+				err = f.Truncate(n)
+				if err != nil {
+					panic(err)
+				}
+			}()
+			N := 500
+			lotsa.Ops(N, 16, func(i, t int) {
+				if i == N/2 && ii&7 == 0 {
+					if err := db.Shrink(); err != nil {
+						panic(err)
+					}
+				}
+				err := db.Update(func(tx *Tx) error {
+					_, _, err := tx.Set(fmt.Sprintf("key:%d", i), fmt.Sprintf("val:%d", i), &SetOptions{
+						Expires: true,
+						TTL:     30,
+					})
+					return err
+				})
+				if err != nil {
+					panic(err)
+				}
+			})
+		}()
+		ii++
 	}
 }

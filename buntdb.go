@@ -861,6 +861,7 @@ func (db *DB) readLoad(rd io.Reader, modTime time.Time) (n int64, err error) {
 			}
 			// copy string
 			parts = append(parts, string(data[:n]))
+			cmdByteSize += int64(n + 2)
 		}
 		// finished reading the command
 
