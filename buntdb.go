@@ -1176,7 +1176,25 @@ func (tx *Tx) Commit() error {
 		// Flushing the buffer only once per transaction.
 		// If this operation fails then the write did failed and we must
 		// rollback.
-		if _, err = tx.db.file.Write(tx.db.buf); err != nil {
+		var n int
+		n, err = tx.db.file.Write(tx.db.buf)
+		if err != nil {
+			if n > 0 {
+				// There was a partial write to disk.
+				// We are possibly out of disk space.
+				// Delete the partially written bytes from the data file by
+				// seeking to the previously known position and performing
+				// a truncate operation.
+				// At this point a syscall failure is fatal and the process
+				// should be killed to avoid corrupting the file.
+				pos, err := tx.db.file.Seek(-int64(n), 1)
+				if err != nil {
+					panic(err)
+				}
+				if err := tx.db.file.Truncate(pos); err != nil {
+					panic(err)
+				}
+			}
 			tx.rollbackInner()
 		}
 		if tx.db.config.SyncPolicy == Always {
