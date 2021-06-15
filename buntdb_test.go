@@ -1487,6 +1487,62 @@ func TestInsertsAndDeleted(t *testing.T) {
 	}
 }
 
+func TestInsertDoesNotMisuseIndex(t *testing.T) {
+	db := testOpen(t)
+	defer testClose(db)
+	fail := func(a, b string) bool { t.Fatal("Misused index"); return false }
+	if err := db.CreateIndex("some", "a*", fail); err != nil {
+		// Only one item is eligible for the index, so no comparison is necessary.
+		t.Fatal(err)
+	}
+	if err := db.Update(func(tx *Tx) error {
+		if _, _, err := tx.Set("a", "1", nil); err != nil {
+			return err
+		}
+		if _, _, err := tx.Set("b", "1", nil); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.Update(func(tx *Tx) error {
+		_, _, err := tx.Set("b", "2", nil)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDeleteDoesNotMisuseIndex(t *testing.T) {
+	db := testOpen(t)
+	defer testClose(db)
+	fail := func(a, b string) bool { t.Fatal("Misused index"); return false }
+	if err := db.CreateIndex("some", "a*", fail); err != nil {
+		// Only one item is eligible for the index, so no comparison is necessary.
+		t.Fatal(err)
+	}
+	if err := db.Update(func(tx *Tx) error {
+		if _, _, err := tx.Set("a", "1", nil); err != nil {
+			return err
+		}
+		if _, _, err := tx.Set("b", "1", nil); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.Update(func(tx *Tx) error {
+		_, err := tx.Delete("b")
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // test index compare functions
 func TestIndexCompare(t *testing.T) {
 	if !IndexFloat("1.5", "1.6") {
