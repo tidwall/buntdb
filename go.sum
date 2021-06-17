@@ -1,9 +1,9 @@
-github.com/tidwall/btree v0.4.2 h1:aLwwJlG+InuFzdAPuBf9YCAR1LvSQ9zhC5aorFPlIPs=
-github.com/tidwall/btree v0.4.2/go.mod h1:huei1BkDWJ3/sLXmO+bsCNELL+Bp2Kks9OLyQFkzvA8=
-github.com/tidwall/gjson v1.7.4 h1:19cchw8FOxkG5mdLRkGf9jqIqEyqdZhPqW60XfyFxk8=
-github.com/tidwall/gjson v1.7.4/go.mod h1:5/xDoumyyDNerp2U36lyolv46b3uF/9Bu6OfyQ9GImk=
-github.com/tidwall/grect v0.1.1 h1:+kMEkxhoqB7rniVXzMEIA66XwU07STgINqxh+qVIndY=
-github.com/tidwall/grect v0.1.1/go.mod h1:CzvbGiFbWUwiJ1JohXLb28McpyBsI00TK9Y6pDWLGRQ=
+github.com/tidwall/btree v0.5.0 h1:IBfCtOj4uOMQcodv3wzYVo0zPqSJObm71mE039/dlXY=
+github.com/tidwall/btree v0.5.0/go.mod h1:TzIRzen6yHbibdSfK6t8QimqbUnoxUSrZfeW7Uob0q4=
+github.com/tidwall/gjson v1.8.0 h1:Qt+orfosKn0rbNTZqHYDqBrmm3UDA4KRkv70fDzG+PQ=
+github.com/tidwall/gjson v1.8.0/go.mod h1:5/xDoumyyDNerp2U36lyolv46b3uF/9Bu6OfyQ9GImk=
+github.com/tidwall/grect v0.1.2 h1:wKVeQVZhjaFCKTTlpkDe3Ex4ko3cMGW3MRKawRe8uQ4=
+github.com/tidwall/grect v0.1.2/go.mod h1:v+n4ewstPGduVJebcp5Eh2WXBJBumNzyhK8GZt4gHNw=
 github.com/tidwall/lotsa v1.0.2 h1:dNVBH5MErdaQ/xd9s769R31/n2dXavsQ0Yf4TMEHHw8=
 github.com/tidwall/lotsa v1.0.2/go.mod h1:X6NiU+4yHA3fE3Puvpnn1XMDrFZrE9JO2/w+UMuqgR8=
 github.com/tidwall/match v1.0.3 h1:FQUVvBImDutD8wJLN6c5eMzWtjgONK9MwIBCOrUJKeE=
