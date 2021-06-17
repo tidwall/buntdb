@@ -454,16 +454,22 @@ func (db *DB) SetConfig(config Config) error {
 // will be replaced with the new one, and return the previous item.
 func (db *DB) insertIntoDatabase(item *dbItem) *dbItem {
 	var pdbi *dbItem
+	idxs := []*index{}
+	for _, idx := range db.idxs {
+		if idx.match(item.key) {
+			idxs = append(idxs, idx)
+		}
+	}
 	prev := db.keys.Set(item)
 	if prev != nil {
 		// A previous item was removed from the keys tree. Let's
 		// fully delete this item from all indexes.
 		pdbi = prev.(*dbItem)
 		if pdbi.opts != nil && pdbi.opts.ex {
-			// Remove it from the exipres tree.
+			// Remove it from the expires tree.
 			db.exps.Delete(pdbi)
 		}
-		for _, idx := range db.idxs {
+		for _, idx := range idxs {
 			if idx.btr != nil {
 				// Remove it from the btree index.
 				idx.btr.Delete(pdbi)
@@ -479,10 +485,7 @@ func (db *DB) insertIntoDatabase(item *dbItem) *dbItem {
 		// expires tree
 		db.exps.Set(item)
 	}
-	for _, idx := range db.idxs {
-		if !idx.match(item.key) {
-			continue
-		}
+	for _, idx := range idxs {
 		if idx.btr != nil {
 			// Add new item to btree index.
 			idx.btr.Set(item)
@@ -512,6 +515,9 @@ func (db *DB) deleteFromDatabase(item *dbItem) *dbItem {
 			db.exps.Delete(pdbi)
 		}
 		for _, idx := range db.idxs {
+			if !idx.match(pdbi.key) {
+				continue
+			}
 			if idx.btr != nil {
 				// Remove it from the btree index.
 				idx.btr.Delete(pdbi)
