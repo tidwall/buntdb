@@ -69,6 +69,7 @@ type DB struct {
 	keys      *btree.BTree      // a tree of all item ordered by key
 	exps      *btree.BTree      // a tree of items ordered by expiration
 	idxs      map[string]*index // the index trees.
+	insIdxs   []*index          // a reuse buffer for gathering indexes
 	flushes   int               // a count of the number of disk flushes
 	closed    bool              // set when the database has been closed
 	config    Config            // the database configuration
@@ -454,7 +455,8 @@ func (db *DB) SetConfig(config Config) error {
 // will be replaced with the new one, and return the previous item.
 func (db *DB) insertIntoDatabase(item *dbItem) *dbItem {
 	var pdbi *dbItem
-	idxs := []*index{}
+	// Generate a list of indexes that this item will be inserted in to.
+	idxs := db.insIdxs
 	for _, idx := range db.idxs {
 		if idx.match(item.key) {
 			idxs = append(idxs, idx)
@@ -485,7 +487,7 @@ func (db *DB) insertIntoDatabase(item *dbItem) *dbItem {
 		// expires tree
 		db.exps.Set(item)
 	}
-	for _, idx := range idxs {
+	for i, idx := range idxs {
 		if idx.btr != nil {
 			// Add new item to btree index.
 			idx.btr.Set(item)
@@ -494,7 +496,11 @@ func (db *DB) insertIntoDatabase(item *dbItem) *dbItem {
 			// Add new item to rtree index.
 			idx.rtr.Insert(item)
 		}
+		// clear the index
+		idxs[i] = nil
 	}
+	// reuse the index list slice
+	db.insIdxs = idxs[:0]
 	// we must return the previous item to the caller.
 	return pdbi
 }
