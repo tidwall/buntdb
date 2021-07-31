@@ -1,5 +1,5 @@
-github.com/tidwall/btree v0.5.0 h1:IBfCtOj4uOMQcodv3wzYVo0zPqSJObm71mE039/dlXY=
-github.com/tidwall/btree v0.5.0/go.mod h1:TzIRzen6yHbibdSfK6t8QimqbUnoxUSrZfeW7Uob0q4=
+github.com/tidwall/btree v0.6.0 h1:JLYAFGV+1gjyFi3iQbO/fupBin+Ooh7dxqVV0twJ1Bo=
+github.com/tidwall/btree v0.6.0/go.mod h1:TzIRzen6yHbibdSfK6t8QimqbUnoxUSrZfeW7Uob0q4=
 github.com/tidwall/gjson v1.8.0 h1:Qt+orfosKn0rbNTZqHYDqBrmm3UDA4KRkv70fDzG+PQ=
 github.com/tidwall/gjson v1.8.0/go.mod h1:5/xDoumyyDNerp2U36lyolv46b3uF/9Bu6OfyQ9GImk=
 github.com/tidwall/grect v0.1.2 h1:wKVeQVZhjaFCKTTlpkDe3Ex4ko3cMGW3MRKawRe8uQ4=

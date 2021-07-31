@@ -140,8 +140,8 @@ type exctx struct {
 func Open(path string) (*DB, error) {
 	db := &DB{}
 	// initialize trees and indexes
-	db.keys = btree.New(lessCtx(nil))
-	db.exps = btree.New(lessCtx(&exctx{db}))
+	db.keys = btreeNew(lessCtx(nil))
+	db.exps = btreeNew(lessCtx(&exctx{db}))
 	db.idxs = make(map[string]*index)
 	// initialize default configuration
 	db.config = Config{
@@ -284,7 +284,7 @@ func (idx *index) clearCopy() *index {
 	}
 	// initialize with empty trees
 	if nidx.less != nil {
-		nidx.btr = btree.New(lessCtx(nidx))
+		nidx.btr = btreeNew(lessCtx(nidx))
 	}
 	if nidx.rect != nil {
 		nidx.rtr = rtred.New(nidx)
@@ -296,7 +296,7 @@ func (idx *index) clearCopy() *index {
 func (idx *index) rebuild() {
 	// initialize trees
 	if idx.less != nil {
-		idx.btr = btree.New(lessCtx(idx))
+		idx.btr = btreeNew(lessCtx(idx))
 	}
 	if idx.rect != nil {
 		idx.rtr = rtred.New(idx)
@@ -920,8 +920,8 @@ func (db *DB) readLoad(rd io.Reader, modTime time.Time) (n int64, err error) {
 			db.deleteFromDatabase(&dbItem{key: parts[1]})
 		} else if (parts[0][0] == 'f' || parts[0][0] == 'F') &&
 			strings.ToLower(parts[0]) == "flushdb" {
-			db.keys = btree.New(lessCtx(nil))
-			db.exps = btree.New(lessCtx(&exctx{db}))
+			db.keys = btreeNew(lessCtx(nil))
+			db.exps = btreeNew(lessCtx(&exctx{db}))
 			db.idxs = make(map[string]*index)
 		} else {
 			return totalSize, ErrInvalid
@@ -1066,8 +1066,8 @@ func (tx *Tx) DeleteAll() error {
 	}
 
 	// now reset the live database trees
-	tx.db.keys = btree.New(lessCtx(nil))
-	tx.db.exps = btree.New(lessCtx(&exctx{tx.db}))
+	tx.db.keys = btreeNew(lessCtx(nil))
+	tx.db.exps = btreeNew(lessCtx(&exctx{tx.db}))
 	tx.db.idxs = make(map[string]*index)
 
 	// finally re-create the indexes
@@ -2311,4 +2311,9 @@ func btreeDescendLessOrEqual(tr *btree.BTree, pivot interface{},
 	iter func(item interface{}) bool,
 ) {
 	tr.Descend(pivot, iter)
+}
+
+func btreeNew(less func(a, b interface{}) bool) *btree.BTree {
+	// Using NewNonConcurrent because we're managing our own locks.
+	return btree.NewNonConcurrent(less)
 }
