@@ -201,10 +201,11 @@ func (db *DB) Save(wr io.Writer) error {
 	defer db.mu.RUnlock()
 	// use a buffered writer and flush every 4MB
 	var buf []byte
+	now := time.Now()
 	// iterated through every item in the database and write to the buffer
 	btreeAscend(db.keys, func(item interface{}) bool {
 		dbi := item.(*dbItem)
-		buf = dbi.writeSetTo(buf)
+		buf = dbi.writeSetTo(buf, now)
 		if len(buf) > 1024*1024*4 {
 			// flush when buffer is over 4MB
 			_, err = wr.Write(buf)
@@ -684,6 +685,7 @@ func (db *DB) Shrink() error {
 			}
 			done = true
 			var n int
+			now := time.Now()
 			btreeAscendGreaterOrEqual(db.keys, &dbItem{key: pivot},
 				func(item interface{}) bool {
 					dbi := item.(*dbItem)
@@ -693,7 +695,7 @@ func (db *DB) Shrink() error {
 						done = false
 						return false
 					}
-					buf = dbi.writeSetTo(buf)
+					buf = dbi.writeSetTo(buf, now)
 					n++
 					return true
 				},
@@ -1177,12 +1179,13 @@ func (tx *Tx) Commit() error {
 		if tx.wc.rbkeys != nil {
 			tx.db.buf = append(tx.db.buf, "*1\r\n$7\r\nflushdb\r\n"...)
 		}
+		now := time.Now()
 		// Each committed record is written to disk
 		for key, item := range tx.wc.commitItems {
 			if item == nil {
 				tx.db.buf = (&dbItem{key: key}).writeDeleteTo(tx.db.buf)
 			} else {
-				tx.db.buf = item.writeSetTo(tx.db.buf)
+				tx.db.buf = item.writeSetTo(tx.db.buf, now)
 			}
 		}
 		// Flushing the buffer only once per transaction.
@@ -1257,14 +1260,14 @@ type dbItem struct {
 
 func appendArray(buf []byte, count int) []byte {
 	buf = append(buf, '*')
-	buf = append(buf, strconv.FormatInt(int64(count), 10)...)
+	buf = strconv.AppendInt(buf, int64(count), 10)
 	buf = append(buf, '\r', '\n')
 	return buf
 }
 
 func appendBulkString(buf []byte, s string) []byte {
 	buf = append(buf, '$')
-	buf = append(buf, strconv.FormatInt(int64(len(s)), 10)...)
+	buf = strconv.AppendInt(buf, int64(len(s)), 10)
 	buf = append(buf, '\r', '\n')
 	buf = append(buf, s...)
 	buf = append(buf, '\r', '\n')
@@ -1272,9 +1275,9 @@ func appendBulkString(buf []byte, s string) []byte {
 }
 
 // writeSetTo writes an item as a single SET record to the a bufio Writer.
-func (dbi *dbItem) writeSetTo(buf []byte) []byte {
+func (dbi *dbItem) writeSetTo(buf []byte, now time.Time) []byte {
 	if dbi.opts != nil && dbi.opts.ex {
-		ex := time.Until(dbi.opts.exat) / time.Second
+		ex := dbi.opts.exat.Sub(now) / time.Second
 		buf = appendArray(buf, 5)
 		buf = appendBulkString(buf, "set")
 		buf = appendBulkString(buf, dbi.key)
