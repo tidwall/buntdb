@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tidwall/assert"
 	"github.com/tidwall/lotsa"
 )
 
@@ -2885,4 +2886,26 @@ func TestReloadNotInvalid(t *testing.T) {
 		}()
 		ii++
 	}
+}
+
+func TestEstSize(t *testing.T) {
+	t.Run("estIntSize", func(t *testing.T) {
+		assert.Assert(estIntSize(0) == 1)
+		assert.Assert(estIntSize(1) == 1)
+		assert.Assert(estIntSize(9) == 1)
+		assert.Assert(estIntSize(10) == 2)
+		assert.Assert(estIntSize(11) == 2)
+		assert.Assert(estIntSize(19) == 2)
+		assert.Assert(estIntSize(20) == 2)
+		assert.Assert(estIntSize(113) == 3)
+		assert.Assert(estIntSize(3822) == 4)
+		assert.Assert(estIntSize(-1) == 2)
+		assert.Assert(estIntSize(-12) == 3)
+		assert.Assert(estIntSize(-124) == 4)
+	})
+	// t.Run("estI
+	// // dbi := dbItem{
+	// // 	key: "hello",
+	// // 	value: "
+	// // }
 }

@@ -1263,12 +1263,15 @@ type dbItem struct {
 	keyless  bool        // keyless item for scanning
 }
 
+// estIntSize returns the string representions size.
+// Has the same result as len(strconv.Itoa(x)).
 func estIntSize(x int) int {
-	if x == 0 {
-		return 1
+	n := 1
+	if x < 0 {
+		n++
+		x *= -1
 	}
-	var n int
-	for x > 0 {
+	for x >= 10 {
 		n++
 		x /= 10
 	}
@@ -1283,7 +1286,10 @@ func estBulkStringSize(s string) int {
 	return 1 + estIntSize(len(s)) + 2 + len(s) + 2
 }
 
-func (dbi *dbItem) estAOFSetSize() (n int) {
+// estAOFSetSize returns an estimated number of bytes that this item will use
+// when stored in the aof file.
+func (dbi *dbItem) estAOFSetSize() int {
+	var n int
 	if dbi.opts != nil && dbi.opts.ex {
 		n += estArraySize(5)
 		n += estBulkStringSize("set")

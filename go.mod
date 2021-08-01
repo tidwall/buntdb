@@ -3,6 +3,7 @@ module github.com/tidwall/buntdb
 go 1.16
 
 require (
+	github.com/tidwall/assert v0.1.0
 	github.com/tidwall/btree v0.6.0
 	github.com/tidwall/gjson v1.8.0
 	github.com/tidwall/grect v0.1.2
