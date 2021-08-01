@@ -955,11 +955,16 @@ func (db *DB) load() error {
 			return err
 		}
 	}
-	pos, err := db.file.Seek(n, 0)
-	if err != nil {
+	if _, err := db.file.Seek(n, 0); err != nil {
 		return err
 	}
-	db.lastaofsz = int(pos)
+	var estaofsz int
+	db.keys.Walk(func(items []interface{}) {
+		for _, v := range items {
+			estaofsz += v.(*dbItem).estAOFSetSize()
+		}
+	})
+	db.lastaofsz += estaofsz
 	return nil
 }
 
@@ -1256,6 +1261,43 @@ type dbItem struct {
 	key, val string      // the binary key and value
 	opts     *dbItemOpts // optional meta information
 	keyless  bool        // keyless item for scanning
+}
+
+func estIntSize(x int) int {
+	if x == 0 {
+		return 1
+	}
+	var n int
+	for x > 0 {
+		n++
+		x /= 10
+	}
+	return n
+}
+
+func estArraySize(count int) int {
+	return 1 + estIntSize(count) + 2
+}
+
+func estBulkStringSize(s string) int {
+	return 1 + estIntSize(len(s)) + 2 + len(s) + 2
+}
+
+func (dbi *dbItem) estAOFSetSize() (n int) {
+	if dbi.opts != nil && dbi.opts.ex {
+		n += estArraySize(5)
+		n += estBulkStringSize("set")
+		n += estBulkStringSize(dbi.key)
+		n += estBulkStringSize(dbi.val)
+		n += estBulkStringSize("ex")
+		n += estBulkStringSize("99") // estimate two byte bulk string
+	} else {
+		n += estArraySize(3)
+		n += estBulkStringSize("set")
+		n += estBulkStringSize(dbi.key)
+		n += estBulkStringSize(dbi.val)
+	}
+	return n
 }
 
 func appendArray(buf []byte, count int) []byte {
