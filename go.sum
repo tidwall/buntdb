@@ -1,7 +1,7 @@
 github.com/tidwall/assert v0.1.0 h1:aWcKyRBUAdLoVebxo95N7+YZVTFF/ASTr7BN4sLP6XI=
 github.com/tidwall/assert v0.1.0/go.mod h1:QLYtGyeqse53vuELQheYl9dngGCJQ+mTtlxcktb+Kj8=
-github.com/tidwall/btree v0.7.2-0.20211218005449-cbb03286d2f2 h1:ehSxDCH+l3iIecsbPBzed/grEc5R24bhLbJdU+QMbHQ=
-github.com/tidwall/btree v0.7.2-0.20211218005449-cbb03286d2f2/go.mod h1:LGm8L/DZjPLmeWGjv5kFrY8dL4uVhMmzmmLYmsObdKE=
+github.com/tidwall/btree v1.1.1-0.20211224172409-40e5f803476c h1:jSRtuFkVrUK4P3VUVYD4WssGige8x3iYKyDBW+FuIsA=
+github.com/tidwall/btree v1.1.1-0.20211224172409-40e5f803476c/go.mod h1:LGm8L/DZjPLmeWGjv5kFrY8dL4uVhMmzmmLYmsObdKE=
 github.com/tidwall/gjson v1.12.1 h1:ikuZsLdhr8Ws0IdROXUS1Gi4v9Z4pGqpX/CvJkxvfpo=
 github.com/tidwall/gjson v1.12.1/go.mod h1:/wbyibRr2FHMks5tjHJ5F8dMZh3AcwJEMf5vlfC0lxk=
 github.com/tidwall/grect v0.1.4 h1:dA3oIgNgWdSspFzn1kS4S/RDpZFLrIxAZOdJKjYapOg=

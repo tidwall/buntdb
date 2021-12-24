@@ -63,19 +63,19 @@ var (
 // DB represents a collection of key-value pairs that persist on disk.
 // Transactions are used for all forms of data access to the DB.
 type DB struct {
-	mu        sync.RWMutex          // the gatekeeper for all fields
-	file      *os.File              // the underlying file
-	buf       []byte                // a buffer to write to
-	keys      *btree.BTree[*dbItem] // a tree of all item ordered by key
-	exps      *btree.BTree[*dbItem] // a tree of items ordered by expiration
-	idxs      map[string]*index     // the index trees.
-	insIdxs   []*index              // a reuse buffer for gathering indexes
-	flushes   int                   // a count of the number of disk flushes
-	closed    bool                  // set when the database has been closed
-	config    Config                // the database configuration
-	persist   bool                  // do we write to disk
-	shrinking bool                  // when an aof shrink is in-process.
-	lastaofsz int                   // the size of the last shrink aof size
+	mu        sync.RWMutex            // the gatekeeper for all fields
+	file      *os.File                // the underlying file
+	buf       []byte                  // a buffer to write to
+	keys      *btree.Generic[*dbItem] // a tree of all item ordered by key
+	exps      *btree.Generic[*dbItem] // a tree of items ordered by expiration
+	idxs      map[string]*index       // the index trees.
+	insIdxs   []*index                // a reuse buffer for gathering indexes
+	flushes   int                     // a count of the number of disk flushes
+	closed    bool                    // set when the database has been closed
+	config    Config                  // the database configuration
+	persist   bool                    // do we write to disk
+	shrinking bool                    // when an aof shrink is in-process.
+	lastaofsz int                     // the size of the last shrink aof size
 }
 
 // SyncPolicy represents how often data is synced to disk.
@@ -245,7 +245,7 @@ func (db *DB) Load(rd io.Reader) error {
 // index represents a b-tree or r-tree index and also acts as the
 // b-tree/r-tree context for itself.
 type index struct {
-	btr     *btree.BTree[*dbItem]                  // contains the items
+	btr     *btree.Generic[*dbItem]                // contains the items
 	rtr     *rtred.RTree                           // contains the items
 	name    string                                 // name of the index
 	pattern string                                 // a required key pattern
@@ -1037,9 +1037,9 @@ type Tx struct {
 
 type txWriteContext struct {
 	// rollback when deleteAll is called
-	rbkeys *btree.BTree[*dbItem] // a tree of all item ordered by key
-	rbexps *btree.BTree[*dbItem] // a tree of items ordered by expiration
-	rbidxs map[string]*index     // the index trees.
+	rbkeys *btree.Generic[*dbItem] // a tree of all item ordered by key
+	rbexps *btree.Generic[*dbItem] // a tree of items ordered by expiration
+	rbidxs map[string]*index       // the index trees.
 
 	rollbackItems   map[string]*dbItem // details for rolling back tx.
 	commitItems     map[string]*dbItem // details for committing tx.
@@ -1616,7 +1616,7 @@ func (tx *Tx) scan(desc, gt, lt bool, index, start, stop string,
 	iter := func(dbi *dbItem) bool {
 		return iterator(dbi.key, dbi.val)
 	}
-	var tr *btree.BTree[*dbItem]
+	var tr *btree.Generic[*dbItem]
 	if index == "" {
 		// empty index means we will use the keys tree.
 		tr = tx.db.keys
@@ -2299,23 +2299,20 @@ func Desc(less func(a, b string) bool) func(a, b string) bool {
 
 //// Wrappers around btree Ascend/Descend
 
-func bLT(tr *btree.BTree[*dbItem], a, b *dbItem) bool {
+func bLT(tr *btree.Generic[*dbItem], a, b *dbItem) bool {
 	return tr.Less(a, b)
 }
-func bGT(tr *btree.BTree[*dbItem], a, b *dbItem) bool {
+func bGT(tr *btree.Generic[*dbItem], a, b *dbItem) bool {
 	return tr.Less(b, a)
 }
 
-// func bLTE(tr *btree.BTree, a, b *dbItem) bool { return !tr.Less(b, a) }
-// func bGTE(tr *btree.BTree, a, b *dbItem) bool { return !tr.Less(a, b) }
-
 // Ascend
 
-func btreeAscend(tr *btree.BTree[*dbItem], iter func(item *dbItem) bool) {
+func btreeAscend(tr *btree.Generic[*dbItem], iter func(item *dbItem) bool) {
 	tr.Scan(iter)
 }
 
-func btreeAscendLessThan(tr *btree.BTree[*dbItem], pivot *dbItem,
+func btreeAscendLessThan(tr *btree.Generic[*dbItem], pivot *dbItem,
 	iter func(item *dbItem) bool,
 ) {
 	tr.Scan(func(item *dbItem) bool {
@@ -2323,13 +2320,13 @@ func btreeAscendLessThan(tr *btree.BTree[*dbItem], pivot *dbItem,
 	})
 }
 
-func btreeAscendGreaterOrEqual(tr *btree.BTree[*dbItem], pivot *dbItem,
+func btreeAscendGreaterOrEqual(tr *btree.Generic[*dbItem], pivot *dbItem,
 	iter func(item *dbItem) bool,
 ) {
 	tr.Ascend(pivot, iter)
 }
 
-func btreeAscendRange(tr *btree.BTree[*dbItem], greaterOrEqual,
+func btreeAscendRange(tr *btree.Generic[*dbItem], greaterOrEqual,
 	lessThan *dbItem, iter func(item *dbItem) bool,
 ) {
 	tr.Ascend(greaterOrEqual, func(item *dbItem) bool {
@@ -2339,11 +2336,11 @@ func btreeAscendRange(tr *btree.BTree[*dbItem], greaterOrEqual,
 
 // Descend
 
-func btreeDescend(tr *btree.BTree[*dbItem], iter func(item *dbItem) bool) {
+func btreeDescend(tr *btree.Generic[*dbItem], iter func(item *dbItem) bool) {
 	tr.Reverse(iter)
 }
 
-func btreeDescendGreaterThan(tr *btree.BTree[*dbItem], pivot *dbItem,
+func btreeDescendGreaterThan(tr *btree.Generic[*dbItem], pivot *dbItem,
 	iter func(item *dbItem) bool,
 ) {
 	tr.Reverse(func(item *dbItem) bool {
@@ -2351,7 +2348,7 @@ func btreeDescendGreaterThan(tr *btree.BTree[*dbItem], pivot *dbItem,
 	})
 }
 
-func btreeDescendRange(tr *btree.BTree[*dbItem], lessOrEqual,
+func btreeDescendRange(tr *btree.Generic[*dbItem], lessOrEqual,
 	greaterThan *dbItem, iter func(item *dbItem) bool,
 ) {
 	tr.Descend(lessOrEqual, func(item *dbItem) bool {
@@ -2359,12 +2356,12 @@ func btreeDescendRange(tr *btree.BTree[*dbItem], lessOrEqual,
 	})
 }
 
-func btreeDescendLessOrEqual(tr *btree.BTree[*dbItem], pivot *dbItem,
+func btreeDescendLessOrEqual(tr *btree.Generic[*dbItem], pivot *dbItem,
 	iter func(item *dbItem) bool,
 ) {
 	tr.Descend(pivot, iter)
 }
 
-func btreeNew(less func(a, b *dbItem) bool) *btree.BTree[*dbItem] {
-	return btree.NewOptions(less, btree.Options{NoLocks: true})
+func btreeNew(less func(a, b *dbItem) bool) *btree.Generic[*dbItem] {
+	return btree.NewGenericOptions(less, btree.Options{NoLocks: true})
 }
