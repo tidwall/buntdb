@@ -140,7 +140,7 @@ type exctx struct {
 func Open(path string) (*DB, error) {
 	db := &DB{}
 	// initialize trees and indexes
-	db.keys = btreeNew(lessCtx(nil))
+	db.keys = btreeNew(dbItemLessForKey)
 	db.exps = btreeNew(lessCtx(&exctx{db}))
 	db.idxs = make(map[string]*index)
 	// initialize default configuration
@@ -916,7 +916,7 @@ func (db *DB) readLoad(rd io.Reader, modTime time.Time) (n int64, err error) {
 			db.deleteFromDatabase(&dbItem{key: parts[1]})
 		} else if (parts[0][0] == 'f' || parts[0][0] == 'F') &&
 			strings.ToLower(parts[0]) == "flushdb" {
-			db.keys = btreeNew(lessCtx(nil))
+			db.keys = btreeNew(dbItemLessForKey)
 			db.exps = btreeNew(lessCtx(&exctx{db}))
 			db.idxs = make(map[string]*index)
 		} else {
@@ -1066,7 +1066,7 @@ func (tx *Tx) DeleteAll() error {
 	}
 
 	// now reset the live database trees
-	tx.db.keys = btreeNew(lessCtx(nil))
+	tx.db.keys = btreeNew(dbItemLessForKey)
 	tx.db.exps = btreeNew(lessCtx(&exctx{tx.db}))
 	tx.db.idxs = make(map[string]*index)
 
@@ -1362,44 +1362,49 @@ func (dbi *dbItem) expiresAt() time.Time {
 	return dbi.opts.exat
 }
 
-// Less determines if a b-tree item is less than another. This is required
-// for ordering, inserting, and deleting items from a b-tree. It's important
-// to note that the ctx parameter is used to help with determine which
-// formula to use on an item. Each b-tree should use a different ctx when
+// dbItemLessForCtx determines if a b-tree item is less than another.
+// This is required for ordering, inserting, and deleting items from a b-tree.
+// It's important to note that the ctx parameter is used to help with determine
+// which formula to use on an item. Each b-tree should use a different ctx when
 // sharing the same item.
-func (dbi *dbItem) Less(dbi2 *dbItem, ctx interface{}) bool {
+func dbItemLessForCtx(a, b *dbItem, ctx interface{}) bool {
 	switch ctx := ctx.(type) {
 	case *exctx:
 		// The expires b-tree formula
-		if dbi2.expiresAt().After(dbi.expiresAt()) {
+		if b.expiresAt().After(a.expiresAt()) {
 			return true
 		}
-		if dbi.expiresAt().After(dbi2.expiresAt()) {
+		if a.expiresAt().After(b.expiresAt()) {
 			return false
 		}
 	case *index:
 		if ctx.less != nil {
 			// Using an index
-			if ctx.less(dbi.val, dbi2.val) {
+			if ctx.less(a.val, b.val) {
 				return true
 			}
-			if ctx.less(dbi2.val, dbi.val) {
+			if ctx.less(b.val, a.val) {
 				return false
 			}
 		}
 	}
 	// Always fall back to the key comparison. This creates absolute uniqueness.
-	if dbi.keyless {
+	return dbItemLessForKey(a, b)
+}
+
+// dbItemLessForKey is the base comparator for items.
+func dbItemLessForKey(a, b *dbItem) bool {
+	if a.keyless {
 		return false
-	} else if dbi2.keyless {
+	} else if b.keyless {
 		return true
 	}
-	return dbi.key < dbi2.key
+	return a.key < b.key
 }
 
 func lessCtx(ctx interface{}) func(a, b *dbItem) bool {
 	return func(a, b *dbItem) bool {
-		return a.Less(b, ctx)
+		return dbItemLessForCtx(a, b, ctx)
 	}
 }
 
