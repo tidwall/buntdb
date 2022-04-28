@@ -2903,9 +2903,18 @@ func TestEstSize(t *testing.T) {
 		assert.Assert(estIntSize(-12) == 3)
 		assert.Assert(estIntSize(-124) == 4)
 	})
-	// t.Run("estI
-	// // dbi := dbItem{
-	// // 	key: "hello",
-	// // 	value: "
-	// // }
+}
+
+func TestWrappedError(t *testing.T) {
+	defer func() {
+		if err, ok := recover().(error); ok {
+			if strings.HasPrefix(err.Error(), "buntdb: ") {
+				err := errors.Unwrap(err)
+				if err.Error() != "my fake error" {
+					t.Fatal("!")
+				}
+			}
+		}
+	}()
+	panicErr(errors.New("my fake error"))
 }
