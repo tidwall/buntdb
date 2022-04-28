@@ -7,6 +7,7 @@ package buntdb
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"sort"
@@ -749,13 +750,13 @@ func (db *DB) Shrink() error {
 		if err := db.file.Close(); err != nil {
 			return err
 		}
-		// Any failures below here is really bad. So just panic.
+		// Any failures below here are really bad. So just panic.
 		if err := os.Rename(tmpname, fname); err != nil {
-			panic(err)
+			panicErr(err)
 		}
 		db.file, err = os.OpenFile(fname, os.O_CREATE|os.O_RDWR, 0666)
 		if err != nil {
-			panic(err)
+			panicErr(err)
 		}
 		pos, err := db.file.Seek(0, 2)
 		if err != nil {
@@ -764,6 +765,10 @@ func (db *DB) Shrink() error {
 		db.lastaofsz = int(pos)
 		return nil
 	}()
+}
+
+func panicErr(err error) error {
+	panic(fmt.Errorf("buntdb: %w", err))
 }
 
 // readLoad reads from the reader and loads commands into the database.
@@ -1209,10 +1214,10 @@ func (tx *Tx) Commit() error {
 				// should be killed to avoid corrupting the file.
 				pos, err := tx.db.file.Seek(-int64(n), 1)
 				if err != nil {
-					panic(err)
+					panicErr(err)
 				}
 				if err := tx.db.file.Truncate(pos); err != nil {
-					panic(err)
+					panicErr(err)
 				}
 			}
 			tx.rollbackInner()
