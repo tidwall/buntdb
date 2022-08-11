@@ -2230,6 +2230,57 @@ func TestTTL(t *testing.T) {
 	}
 }
 
+func TestTTL2Parallel(t *testing.T) {
+	db := testOpen(t)
+	defer testClose(db)
+	err := db.Update(func(tx *Tx) error {
+		for j := 0; j < 1000000; j++ {
+			key := fmt.Sprintf("key%d", j)
+			val := fmt.Sprintf("%d", rand.Intn(100))
+
+			if _, _, err := tx.Set(key, val, &SetOptions{Expires: true, TTL: time.Second * 15}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	callbackFn := func(key, val string) {
+		db.View(func(tx *Tx) error {
+			_, err := tx.TTL(key)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return nil
+		})
+	}
+
+	parallelFn := func(tb *testing.T) {
+		tb.Parallel()
+
+		err := db.View(func(tx *Tx) error {
+			tx.Ascend("", func(key, value string) bool {
+				callbackFn(key, value)
+				return true
+			})
+			return nil
+		})
+
+		if err != nil {
+			tb.Fatal(err)
+		}
+	}
+
+	t.Run("group", func(t *testing.T) {
+		for i := 0; i < 100; i++ {
+			t.Run(fmt.Sprintf("p%d", i), parallelFn)
+		}
+	})
+}
+
 func TestConfig(t *testing.T) {
 	db := testOpen(t)
 	defer testClose(db)
