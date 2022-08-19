@@ -4,8 +4,8 @@ go 1.18
 
 require (
 	github.com/tidwall/assert v0.1.0
-	github.com/tidwall/btree v1.3.1
-	github.com/tidwall/gjson v1.14.1
+	github.com/tidwall/btree v1.4.2
+	github.com/tidwall/gjson v1.14.3
 	github.com/tidwall/grect v0.1.4
 	github.com/tidwall/lotsa v1.0.2
 	github.com/tidwall/match v1.1.1
