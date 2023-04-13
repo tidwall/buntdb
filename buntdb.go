@@ -61,6 +61,8 @@ var (
 	ErrTxIterating = errors.New("tx is iterating")
 )
 
+const useAbsEx = true
+
 // DB represents a collection of key-value pairs that persist on disk.
 // Transactions are used for all forms of data access to the DB.
 type DB struct {
@@ -895,22 +897,29 @@ func (db *DB) readLoad(rd io.Reader, modTime time.Time) (n int64, err error) {
 				return totalSize, ErrInvalid
 			}
 			if len(parts) == 5 {
-				if strings.ToLower(parts[3]) != "ex" {
+				arg := strings.ToLower(parts[3])
+				if arg != "ex" && arg != "ae" {
 					return totalSize, ErrInvalid
 				}
-				ex, err := strconv.ParseUint(parts[4], 10, 64)
+				ex, err := strconv.ParseInt(parts[4], 10, 64)
 				if err != nil {
 					return totalSize, err
 				}
+				var exat time.Time
 				now := time.Now()
-				dur := (time.Duration(ex) * time.Second) - now.Sub(modTime)
-				if dur > 0 {
+				if arg == "ex" {
+					dur := (time.Duration(ex) * time.Second) - now.Sub(modTime)
+					exat = now.Add(dur)
+				} else {
+					exat = time.Unix(ex, 0)
+				}
+				if exat.After(now) {
 					db.insertIntoDatabase(&dbItem{
 						key: parts[1],
 						val: parts[2],
 						opts: &dbItemOpts{
 							ex:   true,
-							exat: now.Add(dur),
+							exat: exat,
 						},
 					})
 				}
@@ -1330,13 +1339,19 @@ func appendBulkString(buf []byte, s string) []byte {
 // writeSetTo writes an item as a single SET record to the a bufio Writer.
 func (dbi *dbItem) writeSetTo(buf []byte, now time.Time) []byte {
 	if dbi.opts != nil && dbi.opts.ex {
-		ex := dbi.opts.exat.Sub(now) / time.Second
 		buf = appendArray(buf, 5)
 		buf = appendBulkString(buf, "set")
 		buf = appendBulkString(buf, dbi.key)
 		buf = appendBulkString(buf, dbi.val)
-		buf = appendBulkString(buf, "ex")
-		buf = appendBulkString(buf, strconv.FormatUint(uint64(ex), 10))
+		if useAbsEx {
+			ex := dbi.opts.exat.Unix()
+			buf = appendBulkString(buf, "ae")
+			buf = appendBulkString(buf, strconv.FormatUint(uint64(ex), 10))
+		} else {
+			ex := dbi.opts.exat.Sub(now) / time.Second
+			buf = appendBulkString(buf, "ex")
+			buf = appendBulkString(buf, strconv.FormatUint(uint64(ex), 10))
+		}
 	} else {
 		buf = appendArray(buf, 3)
 		buf = appendBulkString(buf, "set")
