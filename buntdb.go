@@ -1563,6 +1563,25 @@ func (tx *Tx) Get(key string, ignoreExpired ...bool) (val string, err error) {
 	return item.val, nil
 }
 
+// GetWithTTL returns a value for a key together with it's TTL.
+// If the item does not exist or if the item has expired then ErrNotFound is returned.
+// A negative duration will be returned for items that do not have an expiration.
+func (tx *Tx) GetWithTTL(key string) (string, time.Duration, error) {
+	if tx.db == nil {
+		return "", 0, ErrTxClosed
+	}
+	item := tx.db.get(key)
+	if item == nil || item.expired() {
+		return "", 0, ErrNotFound
+	} else if item.opts == nil || !item.opts.ex {
+		return item.val, -1, nil
+	} else if ttl := time.Until(item.opts.exat); ttl < 0 {
+		return "", 0, ErrNotFound
+	} else {
+		return item.val, ttl, nil
+	}
+}
+
 // Delete removes an item from the database based on the item's key. If the item
 // does not exist or if the item has expired then ErrNotFound is returned.
 //
