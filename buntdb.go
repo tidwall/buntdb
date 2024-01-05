@@ -913,16 +913,16 @@ func (db *DB) readLoad(rd io.Reader, modTime time.Time) (n int64, err error) {
 				} else {
 					exat = time.Unix(ex, 0)
 				}
-				if exat.After(now) {
-					db.insertIntoDatabase(&dbItem{
-						key: parts[1],
-						val: parts[2],
-						opts: &dbItemOpts{
-							ex:   true,
-							exat: exat,
-						},
-					})
-				}
+				// just insert there and update in case of the TTL changed
+				// even if the key expired already, we still have enough infomation to get with ignoreExpired before any shrink.
+				db.insertIntoDatabase(&dbItem{
+					key: parts[1],
+					val: parts[2],
+					opts: &dbItemOpts{
+						ex:   true,
+						exat: exat,
+					},
+				})
 			} else {
 				db.insertIntoDatabase(&dbItem{key: parts[1], val: parts[2]})
 			}

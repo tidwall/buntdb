@@ -2499,10 +2499,10 @@ func Benchmark_Descend_10000(t *testing.B) {
 }
 
 /*
-func Benchmark_Spatial_2D(t *testing.B) {
-	N := 100000
-	db, _, _ := benchOpenFillData(t, N, true, true, false, true, 100)
-	defer benchClose(t, false, db)
+	func Benchmark_Spatial_2D(t *testing.B) {
+		N := 100000
+		db, _, _ := benchOpenFillData(t, N, true, true, false, true, 100)
+		defer benchClose(t, false, db)
 
 }
 */
@@ -2917,4 +2917,53 @@ func TestWrappedError(t *testing.T) {
 		}
 	}()
 	panicErr(errors.New("my fake error"))
+}
+
+func TestKeyExpiredAfterCloseAndBeforeReopen(t *testing.T) {
+	// This tests an bug identified in Issue #112.
+	// A SET without TTL followed by another SET with TTL on the same key,
+	// and accidentally the key expired after the db closed therefor the key wasn't
+	// DEL by backgroundManager. On the next time we load the db, Oops,
+	// db.readLoad just ignore the second OP and remains the first one.
+
+	f, err := os.CreateTemp("", "")
+	if err != nil {
+		panicErr(err)
+	}
+	defer os.Remove(f.Name())
+	defer f.Close()
+
+	db, err := Open(f.Name())
+	if err != nil {
+		panicErr(err)
+	}
+	err = db.Update(func(tx *Tx) error {
+		_, _, err := tx.Set("key:112", "value:112-old", nil)
+		return err
+	})
+	if err != nil {
+		panicErr(err)
+	}
+	err = db.Update(func(tx *Tx) error {
+		_, _, err := tx.Set("key:112", "value:112", &SetOptions{Expires: true, TTL: time.Second})
+		return err
+	})
+	if err != nil {
+		panicErr(err)
+	}
+	db.Close()
+
+	// make sure the key expired
+	time.Sleep(time.Second)
+
+	db, err = Open(f.Name())
+	if err != nil {
+		panicErr(err)
+	}
+	err = db.View(func(tx *Tx) error {
+		_, err := tx.Get("key:112")
+		return err
+	})
+	assert.Assert(err == ErrNotFound)
+
 }
