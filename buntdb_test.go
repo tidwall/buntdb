@@ -34,7 +34,7 @@ func testReOpenDelay(t testing.TB, db *DB, dur time.Duration) *DB {
 		}
 	}
 	time.Sleep(dur)
-	db, err := Open("data.db")
+	db, err := Open("data.db", []byte("supersecretkey16"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func TestBackgroudOperations(t *testing.T) {
 	}
 }
 func TestSaveLoad(t *testing.T) {
-	db, _ := Open(":memory:")
+	db, _ := Open(":memory:", []byte("supersecretkey16"))
 	defer db.Close()
 	if err := db.Update(func(tx *Tx) error {
 		for i := 0; i < 20; i++ {
@@ -121,7 +121,7 @@ func TestSaveLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 	db.Close()
-	db, _ = Open(":memory:")
+	db, _ = Open(":memory:", []byte("supersecretkey16"))
 	defer db.Close()
 	f, err = os.Open("temp.db")
 	if err != nil {
@@ -1027,7 +1027,7 @@ func TestVariousTx(t *testing.T) {
 func TestNearby(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
 	N := 100000
-	db, _ := Open(":memory:")
+	db, _ := Open(":memory:", []byte("supersecretkey16"))
 	db.CreateSpatialIndex("points", "*", IndexRect)
 	db.Update(func(tx *Tx) error {
 		for i := 0; i < N; i++ {
@@ -1065,7 +1065,7 @@ func TestNearby(t *testing.T) {
 }
 
 func Example_descKeys() {
-	db, _ := Open(":memory:")
+	db, _ := Open(":memory:", []byte("supersecretkey16"))
 	db.CreateIndex("name", "*", IndexString)
 	db.Update(func(tx *Tx) error {
 		tx.Set("user:100:first", "Tom", nil)
@@ -1127,7 +1127,7 @@ func Example_descKeys() {
 }
 
 func ExampleDesc() {
-	db, _ := Open(":memory:")
+	db, _ := Open(":memory:", []byte("supersecretkey16"))
 	db.CreateIndex("last_name_age", "*", IndexJSON("name.last"), Desc(IndexJSON("age")))
 	db.Update(func(tx *Tx) error {
 		tx.Set("1", `{"name":{"first":"Tom","last":"Johnson"},"age":38}`, nil)
@@ -1156,7 +1156,7 @@ func ExampleDesc() {
 }
 
 func ExampleDB_CreateIndex_jSON() {
-	db, _ := Open(":memory:")
+	db, _ := Open(":memory:", []byte("supersecretkey16"))
 	db.CreateIndex("last_name", "*", IndexJSON("name.last"))
 	db.CreateIndex("age", "*", IndexJSON("age"))
 	db.Update(func(tx *Tx) error {
@@ -1202,7 +1202,7 @@ func ExampleDB_CreateIndex_jSON() {
 }
 
 func ExampleDB_CreateIndex_strings() {
-	db, _ := Open(":memory:")
+	db, _ := Open(":memory:", []byte("supersecretkey16"))
 	db.CreateIndex("name", "*", IndexString)
 	db.Update(func(tx *Tx) error {
 		tx.Set("1", "Tom", nil)
@@ -1231,7 +1231,7 @@ func ExampleDB_CreateIndex_strings() {
 }
 
 func ExampleDB_CreateIndex_ints() {
-	db, _ := Open(":memory:")
+	db, _ := Open(":memory:", []byte("supersecretkey16"))
 	db.CreateIndex("age", "*", IndexInt)
 	db.Update(func(tx *Tx) error {
 		tx.Set("1", "30", nil)
@@ -1259,7 +1259,7 @@ func ExampleDB_CreateIndex_ints() {
 	//4: 76
 }
 func ExampleDB_CreateIndex_multipleFields() {
-	db, _ := Open(":memory:")
+	db, _ := Open(":memory:", []byte("supersecretkey16"))
 	db.CreateIndex("last_name_age", "*", IndexJSON("name.last"), IndexJSON("age"))
 	db.Update(func(tx *Tx) error {
 		tx.Set("1", `{"name":{"first":"Tom","last":"Johnson"},"age":38}`, nil)
@@ -1373,7 +1373,7 @@ func TestDatabaseFormat(t *testing.T) {
 		}
 		defer os.RemoveAll("data.db")
 
-		db, err := Open("data.db")
+		db, err := Open("data.db", []byte("supersecretkey16"))
 		if err == nil {
 			if do != nil {
 				if err := do(db); err != nil {
@@ -1596,7 +1596,7 @@ func TestOpeningAFolder(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = os.RemoveAll("dir.tmp") }()
-	db, err := Open("dir.tmp")
+	db, err := Open("dir.tmp", []byte("supersecretkey16"))
 	if err == nil {
 		if err := db.Close(); err != nil {
 			t.Fatal(err)
@@ -1614,7 +1614,7 @@ func TestOpeningInvalidDatabaseFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = os.RemoveAll("data.db") }()
-	db, err := Open("data.db")
+	db, err := Open("data.db", []byte("supersecretkey16"))
 	if err == nil {
 		if err := db.Close(); err != nil {
 			t.Fatal(err)
@@ -1628,7 +1628,7 @@ func TestOpeningClosedDatabase(t *testing.T) {
 	if err := os.RemoveAll("data.db"); err != nil {
 		t.Fatal(err)
 	}
-	db, err := Open("data.db")
+	db, err := Open("data.db", []byte("supersecretkey16"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1639,7 +1639,7 @@ func TestOpeningClosedDatabase(t *testing.T) {
 	if err := db.Close(); err != ErrDatabaseClosed {
 		t.Fatal("should not be able to close a closed database")
 	}
-	db, err = Open(":memory:")
+	db, err = Open(":memory:", []byte("supersecretkey16"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1716,7 +1716,7 @@ func TestShrink(t *testing.T) {
 		t.Fatal("shrink on a closed databse should not be allowed")
 	}
 	// Now we will open a db that does not persist
-	db, err = Open(":memory:")
+	db, err = Open(":memory:", []byte("supersecretkey16"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2295,9 +2295,9 @@ func benchOpenFillData(t *testing.B, N int,
 		if err := os.RemoveAll("data.db"); err != nil {
 			t.Fatal(err)
 		}
-		db, err = Open("data.db")
+		db, err = Open("data.db", []byte("supersecretkey16"))
 	} else {
-		db, err = Open(":memory:")
+		db, err = Open(":memory:", []byte("supersecretkey16"))
 	}
 	if err != nil {
 		t.Fatal(err)
@@ -2499,10 +2499,10 @@ func Benchmark_Descend_10000(t *testing.B) {
 }
 
 /*
-func Benchmark_Spatial_2D(t *testing.B) {
-	N := 100000
-	db, _, _ := benchOpenFillData(t, N, true, true, false, true, 100)
-	defer benchClose(t, false, db)
+	func Benchmark_Spatial_2D(t *testing.B) {
+		N := 100000
+		db, _, _ := benchOpenFillData(t, N, true, true, false, true, 100)
+		defer benchClose(t, false, db)
 
 }
 */
@@ -2756,7 +2756,7 @@ func TestTransactionLeak(t *testing.T) {
 	// This tests an bug identified in Issue #69. When inside a Update
 	// transaction, a Set after a Delete for a key that previously exists will
 	// remove the key when the transaction was rolledback.
-	buntDB, err := Open(":memory:")
+	buntDB, err := Open(":memory:", []byte("supersecretkey16"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2841,7 +2841,7 @@ func TestReloadNotInvalid(t *testing.T) {
 	ii := 0
 	for time.Since(start) < time.Second*5 {
 		func() {
-			db, err := Open("data.db")
+			db, err := Open("data.db", []byte("supersecretkey16"))
 			if err != nil {
 				t.Fatal(err)
 			}

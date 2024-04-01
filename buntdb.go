@@ -6,6 +6,9 @@ package buntdb
 
 import (
 	"bufio"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
@@ -66,19 +69,20 @@ const useAbsEx = true
 // DB represents a collection of key-value pairs that persist on disk.
 // Transactions are used for all forms of data access to the DB.
 type DB struct {
-	mu        sync.RWMutex      // the gatekeeper for all fields
-	file      *os.File          // the underlying file
-	buf       []byte            // a buffer to write to
-	keys      *btree.BTree      // a tree of all item ordered by key
-	exps      *btree.BTree      // a tree of items ordered by expiration
-	idxs      map[string]*index // the index trees.
-	insIdxs   []*index          // a reuse buffer for gathering indexes
-	flushes   int               // a count of the number of disk flushes
-	closed    bool              // set when the database has been closed
-	config    Config            // the database configuration
-	persist   bool              // do we write to disk
-	shrinking bool              // when an aof shrink is in-process.
-	lastaofsz int               // the size of the last shrink aof size
+	mu            sync.RWMutex      // the gatekeeper for all fields
+	file          *os.File          // the underlying file
+	buf           []byte            // a buffer to write to
+	keys          *btree.BTree      // a tree of all item ordered by key
+	exps          *btree.BTree      // a tree of items ordered by expiration
+	idxs          map[string]*index // the index trees.
+	insIdxs       []*index          // a reuse buffer for gathering indexes
+	flushes       int               // a count of the number of disk flushes
+	closed        bool              // set when the database has been closed
+	config        Config            // the database configuration
+	persist       bool              // do we write to disk
+	shrinking     bool              // when an aof shrink is in-process.
+	lastaofsz     int               // the size of the last shrink aof size
+	encryptionKey []byte            // store the encryption key
 }
 
 // SyncPolicy represents how often data is synced to disk.
@@ -140,8 +144,10 @@ type exctx struct {
 
 // Open opens a database at the provided path.
 // If the file does not exist then it will be created automatically.
-func Open(path string) (*DB, error) {
-	db := &DB{}
+func Open(path string, encryptionKey []byte) (*DB, error) {
+	db := &DB{
+		encryptionKey: encryptionKey,
+	}
 	// initialize trees and indexes
 	db.keys = btreeNew(lessCtx(nil))
 	db.exps = btreeNew(lessCtx(&exctx{db}))
@@ -208,7 +214,7 @@ func (db *DB) Save(wr io.Writer) error {
 	// iterated through every item in the database and write to the buffer
 	btreeAscend(db.keys, func(item interface{}) bool {
 		dbi := item.(*dbItem)
-		buf = dbi.writeSetTo(buf, now)
+		buf = dbi.writeSetTo(buf, now, db.encryptionKey)
 		if len(buf) > 1024*1024*4 {
 			// flush when buffer is over 4MB
 			_, err = wr.Write(buf)
@@ -244,6 +250,44 @@ func (db *DB) Load(rd io.Reader) error {
 	}
 	_, err := db.readLoad(rd, time.Now())
 	return err
+}
+
+func encrypt(data []byte, key []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, err
+	}
+	ciphertext := gcm.Seal(nonce, nonce, data, nil)
+	return ciphertext, nil
+}
+
+func decrypt(data []byte, key []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	nonceSize := gcm.NonceSize()
+	if len(data) < nonceSize {
+		return nil, errors.New("ciphertext too short")
+	}
+	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return nil, err
+	}
+	return plaintext, nil
 }
 
 // index represents a b-tree or r-tree index and also acts as the
@@ -698,7 +742,7 @@ func (db *DB) Shrink() error {
 						done = false
 						return false
 					}
-					buf = dbi.writeSetTo(buf, now)
+					buf = dbi.writeSetTo(buf, now, db.encryptionKey)
 					n++
 					return true
 				},
@@ -914,6 +958,14 @@ func (db *DB) readLoad(rd io.Reader, modTime time.Time) (n int64, err error) {
 					exat = time.Unix(ex, 0)
 				}
 				if exat.After(now) {
+					if db.encryptionKey != nil {
+						// Decrypt the value with the provided encryption key
+						plaintext, err := decrypt([]byte(parts[2]), db.encryptionKey)
+						if err != nil {
+							return totalSize, err
+						}
+						parts[2] = string(plaintext)
+					}
 					db.insertIntoDatabase(&dbItem{
 						key: parts[1],
 						val: parts[2],
@@ -924,6 +976,14 @@ func (db *DB) readLoad(rd io.Reader, modTime time.Time) (n int64, err error) {
 					})
 				}
 			} else {
+				if db.encryptionKey != nil {
+					// Decrypt the value with the provided encryption key
+					plaintext, err := decrypt([]byte(parts[2]), db.encryptionKey)
+					if err != nil {
+						return totalSize, err
+					}
+					parts[2] = string(plaintext)
+				}
 				db.insertIntoDatabase(&dbItem{key: parts[1], val: parts[2]})
 			}
 		} else if (parts[0][0] == 'd' || parts[0][0] == 'D') &&
@@ -1204,7 +1264,7 @@ func (tx *Tx) Commit() error {
 			if item == nil {
 				tx.db.buf = (&dbItem{key: key}).writeDeleteTo(tx.db.buf)
 			} else {
-				tx.db.buf = item.writeSetTo(tx.db.buf, now)
+				tx.db.buf = item.writeSetTo(tx.db.buf, now, tx.db.encryptionKey)
 			}
 		}
 		// Flushing the buffer only once per transaction.
@@ -1336,23 +1396,44 @@ func appendBulkString(buf []byte, s string) []byte {
 	return buf
 }
 
-// writeSetTo writes an item as a single SET record to the a bufio Writer.
-func (dbi *dbItem) writeSetTo(buf []byte, now time.Time) []byte {
+// writeSetTo writes an item as a single SET record to the buffer.
+func (dbi *dbItem) writeSetTo(buf []byte, now time.Time, encryptionKey []byte) []byte {
 	if dbi.opts != nil && dbi.opts.ex {
-		buf = appendArray(buf, 5)
-		buf = appendBulkString(buf, "set")
-		buf = appendBulkString(buf, dbi.key)
-		buf = appendBulkString(buf, dbi.val)
+		// The item has expiration options, encode them in the value
+		if encryptionKey != nil {
+			// Encrypt the value with the provided encryption key
+			val, err := encrypt([]byte(dbi.val), encryptionKey)
+			if err != nil {
+				panic(err)
+			}
+			dbi.val = string(val)
+		}
 		if useAbsEx {
 			ex := dbi.opts.exat.Unix()
+			buf = appendArray(buf, 5)
+			buf = appendBulkString(buf, "set")
+			buf = appendBulkString(buf, dbi.key)
+			buf = appendBulkString(buf, dbi.val)
 			buf = appendBulkString(buf, "ae")
 			buf = appendBulkString(buf, strconv.FormatUint(uint64(ex), 10))
 		} else {
 			ex := dbi.opts.exat.Sub(now) / time.Second
+			buf = appendArray(buf, 5)
+			buf = appendBulkString(buf, "set")
+			buf = appendBulkString(buf, dbi.key)
+			buf = appendBulkString(buf, dbi.val)
 			buf = appendBulkString(buf, "ex")
 			buf = appendBulkString(buf, strconv.FormatUint(uint64(ex), 10))
 		}
 	} else {
+		if encryptionKey != nil {
+			// Encrypt the value with the provided encryption key
+			val, err := encrypt([]byte(dbi.val), encryptionKey)
+			if err != nil {
+				panic(err)
+			}
+			dbi.val = string(val)
+		}
 		buf = appendArray(buf, 3)
 		buf = appendBulkString(buf, "set")
 		buf = appendBulkString(buf, dbi.key)
