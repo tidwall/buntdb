@@ -922,6 +922,10 @@ func (db *DB) readLoad(rd io.Reader, modTime time.Time) (n int64, err error) {
 							exat: exat,
 						},
 					})
+				} else {
+					db.deleteFromDatabase(&dbItem{
+						key: parts[1],
+					})
 				}
 			} else {
 				db.insertIntoDatabase(&dbItem{key: parts[1], val: parts[2]})
@@ -1637,6 +1641,9 @@ func (tx *Tx) scan(desc, gt, lt bool, index, start, stop string,
 	// wrap a btree specific iterator around the user-defined iterator.
 	iter := func(item interface{}) bool {
 		dbi := item.(*dbItem)
+		if dbi.expired() {
+			return true
+		}
 		return iterator(dbi.key, dbi.val)
 	}
 	var tr *btree.BTree
