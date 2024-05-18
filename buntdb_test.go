@@ -2193,6 +2193,64 @@ func TestTTLReOpen(t *testing.T) {
 	}
 }
 
+func TestGetWithTTL(t *testing.T) {
+	db := testOpen(t)
+	defer testClose(db)
+	err := db.Update(func(tx *Tx) error {
+		if _, _, err := tx.Set("key1", "val1", &SetOptions{Expires: true, TTL: time.Second}); err != nil {
+			return err
+		}
+		if _, _, err := tx.Set("key2", "val2", nil); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.View(func(tx *Tx) error {
+		v, dur1, err := tx.GetWithTTL("key1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if v != "val1" {
+			t.Fatalf("expected [%v], got [%v]", "val1", v)
+		}
+		if dur1 > time.Second || dur1 <= 0 {
+			t.Fatalf("expecting between zero and one second, got '%v'", dur1)
+		}
+		v, dur1, err = tx.GetWithTTL("key2")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if dur1 >= 0 {
+			t.Fatalf("expecting a negative value, got '%v'", dur1)
+		}
+		if v != "val2" {
+			t.Fatalf("expected [%v], got [%v]", "val2", v)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Second)
+	db.View(func(tx *Tx) error {
+		v, dur1, err := tx.GetWithTTL("key1")
+		if err != ErrNotFound {
+			t.Fatalf("expecting ErrNotFound error")
+		}
+		if v != "" {
+			t.Fatalf("expected '', got [%v]", v)
+		}
+		if dur1 != 0 {
+			t.Fatalf("expecting 0, got '%v'", dur1)
+		}
+		return nil
+	})
+}
+
+
 func TestTTL(t *testing.T) {
 	db := testOpen(t)
 	defer testClose(db)
