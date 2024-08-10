@@ -1,8 +1,4 @@
-// Package buntdb implements a low-level in-memory key/value store in pure Go.
-// It persists to disk, is ACID compliant, and uses locking for multiple
-// readers and a single writer. Bunt is ideal for projects that need a
-// dependable database, and favor speed over data size.
-package buntdb
+package embdb
 
 import (
 	"bufio"
@@ -18,9 +14,7 @@ import (
 
 	"github.com/tidwall/btree"
 	"github.com/tidwall/gjson"
-	"github.com/tidwall/grect"
 	"github.com/tidwall/match"
-	"github.com/tidwall/rtred"
 )
 
 var (
@@ -246,17 +240,15 @@ func (db *DB) Load(rd io.Reader) error {
 	return err
 }
 
-// index represents a b-tree or r-tree index and also acts as the
+// index represents a b-tree index and also acts as the
 // b-tree/r-tree context for itself.
 type index struct {
-	btr     *btree.BTree                           // contains the items
-	rtr     *rtred.RTree                           // contains the items
-	name    string                                 // name of the index
-	pattern string                                 // a required key pattern
-	less    func(a, b string) bool                 // less comparison function
-	rect    func(item string) (min, max []float64) // rect from string function
-	db      *DB                                    // the origin database
-	opts    IndexOptions                           // index options
+	btr     *btree.BTree           // contains the items
+	name    string                 // name of the index
+	pattern string                 // a required key pattern
+	less    func(a, b string) bool // less comparison function
+	db      *DB                    // the origin database
+	opts    IndexOptions           // index options
 }
 
 // match matches the pattern to the key
@@ -283,15 +275,11 @@ func (idx *index) clearCopy() *index {
 		pattern: idx.pattern,
 		db:      idx.db,
 		less:    idx.less,
-		rect:    idx.rect,
 		opts:    idx.opts,
 	}
 	// initialize with empty trees
 	if nidx.less != nil {
 		nidx.btr = btreeNew(lessCtx(nidx))
-	}
-	if nidx.rect != nil {
-		nidx.rtr = rtred.New(nidx)
 	}
 	return nidx
 }
@@ -302,9 +290,7 @@ func (idx *index) rebuild() {
 	if idx.less != nil {
 		idx.btr = btreeNew(lessCtx(idx))
 	}
-	if idx.rect != nil {
-		idx.rtr = rtred.New(idx)
-	}
+
 	// iterate through all keys and fill the index
 	btreeAscend(idx.db.keys, func(item interface{}) bool {
 		dbi := item.(*dbItem)
@@ -315,9 +301,7 @@ func (idx *index) rebuild() {
 		if idx.less != nil {
 			idx.btr.Set(dbi)
 		}
-		if idx.rect != nil {
-			idx.rtr.Insert(dbi)
-		}
+
 		return true
 	})
 }
@@ -337,8 +321,10 @@ func (idx *index) rebuild() {
 // less function to handle the content format and comparison.
 // There are some default less function that can be used such as
 // IndexString, IndexBinary, etc.
-func (db *DB) CreateIndex(name, pattern string,
-	less ...func(a, b string) bool) error {
+func (db *DB) CreateIndex(
+	name, pattern string,
+	less ...func(a, b string) bool,
+) error {
 	return db.Update(func(tx *Tx) error {
 		return tx.CreateIndex(name, pattern, less...)
 	})
@@ -348,8 +334,10 @@ func (db *DB) CreateIndex(name, pattern string,
 // The items are ordered in an b-tree and can be retrieved using the
 // Ascend* and Descend* methods.
 // If a previous index with the same name exists, that index will be deleted.
-func (db *DB) ReplaceIndex(name, pattern string,
-	less ...func(a, b string) bool) error {
+func (db *DB) ReplaceIndex(
+	name, pattern string,
+	less ...func(a, b string) bool,
+) error {
 	return db.Update(func(tx *Tx) error {
 		err := tx.CreateIndex(name, pattern, less...)
 		if err != nil {
@@ -359,49 +347,6 @@ func (db *DB) ReplaceIndex(name, pattern string,
 					return err
 				}
 				return tx.CreateIndex(name, pattern, less...)
-			}
-			return err
-		}
-		return nil
-	})
-}
-
-// CreateSpatialIndex builds a new index and populates it with items.
-// The items are organized in an r-tree and can be retrieved using the
-// Intersects method.
-// An error will occur if an index with the same name already exists.
-//
-// The rect function converts a string to a rectangle. The rectangle is
-// represented by two arrays, min and max. Both arrays may have a length
-// between 1 and 20, and both arrays must match in length. A length of 1 is a
-// one dimensional rectangle, and a length of 4 is a four dimension rectangle.
-// There is support for up to 20 dimensions.
-// The values of min must be less than the values of max at the same dimension.
-// Thus min[0] must be less-than-or-equal-to max[0].
-// The IndexRect is a default function that can be used for the rect
-// parameter.
-func (db *DB) CreateSpatialIndex(name, pattern string,
-	rect func(item string) (min, max []float64)) error {
-	return db.Update(func(tx *Tx) error {
-		return tx.CreateSpatialIndex(name, pattern, rect)
-	})
-}
-
-// ReplaceSpatialIndex builds a new index and populates it with items.
-// The items are organized in an r-tree and can be retrieved using the
-// Intersects method.
-// If a previous index with the same name exists, that index will be deleted.
-func (db *DB) ReplaceSpatialIndex(name, pattern string,
-	rect func(item string) (min, max []float64)) error {
-	return db.Update(func(tx *Tx) error {
-		err := tx.CreateSpatialIndex(name, pattern, rect)
-		if err != nil {
-			if err == ErrIndexExists {
-				err := tx.DropIndex(name)
-				if err != nil {
-					return err
-				}
-				return tx.CreateSpatialIndex(name, pattern, rect)
 			}
 			return err
 		}
@@ -480,10 +425,7 @@ func (db *DB) insertIntoDatabase(item *dbItem) *dbItem {
 				// Remove it from the btree index.
 				idx.btr.Delete(pdbi)
 			}
-			if idx.rtr != nil {
-				// Remove it from the rtree index.
-				idx.rtr.Remove(pdbi)
-			}
+
 		}
 	}
 	if item.opts != nil && item.opts.ex {
@@ -496,10 +438,7 @@ func (db *DB) insertIntoDatabase(item *dbItem) *dbItem {
 			// Add new item to btree index.
 			idx.btr.Set(item)
 		}
-		if idx.rtr != nil {
-			// Add new item to rtree index.
-			idx.rtr.Insert(item)
-		}
+
 		// clear the index
 		idxs[i] = nil
 	}
@@ -532,10 +471,7 @@ func (db *DB) deleteFromDatabase(item *dbItem) *dbItem {
 				// Remove it from the btree index.
 				idx.btr.Delete(pdbi)
 			}
-			if idx.rtr != nil {
-				// Remove it from the rtree index.
-				idx.rtr.Remove(pdbi)
-			}
+
 		}
 	}
 	return pdbi
@@ -1434,16 +1370,6 @@ func lessCtx(ctx interface{}) func(a, b interface{}) bool {
 	}
 }
 
-// Rect converts a string to a rectangle.
-// An invalid rectangle will cause a panic.
-func (dbi *dbItem) Rect(ctx interface{}) (min, max []float64) {
-	switch ctx := ctx.(type) {
-	case *index:
-		return ctx.rect(dbi.val)
-	}
-	return nil, nil
-}
-
 // SetOptions represents options that may be included with the Set() command.
 type SetOptions struct {
 	// Expires indicates that the Set() key-value will expire
@@ -1469,22 +1395,6 @@ func (tx *Tx) GetLess(index string) (func(a, b string) bool, error) {
 	return idx.less, nil
 }
 
-// GetRect returns the rect function for an index. This is handy for
-// doing ad-hoc searches inside a transaction.
-// Returns ErrNotFound if the index is not found or there is no rect
-// function bound to the index
-func (tx *Tx) GetRect(index string) (func(s string) (min, max []float64),
-	error) {
-	if tx.db == nil {
-		return nil, ErrTxClosed
-	}
-	idx, ok := tx.db.idxs[index]
-	if !ok || idx.rect == nil {
-		return nil, ErrNotFound
-	}
-	return idx.rect, nil
-}
-
 // Set inserts or replaces an item in the database based on the key.
 // The opt params may be used for additional functionality such as forcing
 // the item to be evicted at a specified time. When the return value
@@ -1496,8 +1406,10 @@ func (tx *Tx) GetRect(index string) (func(s string) (min, max []float64),
 //
 // Only a writable transaction can be used with this operation.
 // This operation is not allowed during iterations such as Ascend* & Descend*.
-func (tx *Tx) Set(key, value string, opts *SetOptions) (previousValue string,
-	replaced bool, err error) {
+func (tx *Tx) Set(key, value string, opts *SetOptions) (
+	previousValue string,
+	replaced bool, err error,
+) {
 	if tx.db == nil {
 		return "", false, ErrTxClosed
 	} else if !tx.writable {
@@ -1633,8 +1545,10 @@ func (tx *Tx) TTL(key string) (time.Duration, error) {
 // The start and stop params are the greaterThan, lessThan limits. For
 // descending order, these will be lessThan, greaterThan.
 // An error will be returned if the tx is closed or the index is not found.
-func (tx *Tx) scan(desc, gt, lt bool, index, start, stop string,
-	iterator func(key, value string) bool) error {
+func (tx *Tx) scan(
+	desc, gt, lt bool, index, start, stop string,
+	iterator func(key, value string) bool,
+) error {
 	if tx.db == nil {
 		return ErrTxClosed
 	}
@@ -1719,8 +1633,10 @@ func Match(key, pattern string) bool {
 }
 
 // AscendKeys allows for iterating through keys based on the specified pattern.
-func (tx *Tx) AscendKeys(pattern string,
-	iterator func(key, value string) bool) error {
+func (tx *Tx) AscendKeys(
+	pattern string,
+	iterator func(key, value string) bool,
+) error {
 	if pattern == "" {
 		return nil
 	}
@@ -1752,8 +1668,10 @@ func (tx *Tx) AscendKeys(pattern string,
 }
 
 // DescendKeys allows for iterating through keys based on the specified pattern.
-func (tx *Tx) DescendKeys(pattern string,
-	iterator func(key, value string) bool) error {
+func (tx *Tx) DescendKeys(
+	pattern string,
+	iterator func(key, value string) bool,
+) error {
 	if pattern == "" {
 		return nil
 	}
@@ -1790,8 +1708,10 @@ func (tx *Tx) DescendKeys(pattern string,
 // as specified by the less() function of the defined index.
 // When an index is not provided, the results will be ordered by the item key.
 // An invalid index will return an error.
-func (tx *Tx) Ascend(index string,
-	iterator func(key, value string) bool) error {
+func (tx *Tx) Ascend(
+	index string,
+	iterator func(key, value string) bool,
+) error {
 	return tx.scan(false, false, false, index, "", "", iterator)
 }
 
@@ -1801,8 +1721,10 @@ func (tx *Tx) Ascend(index string,
 // as specified by the less() function of the defined index.
 // When an index is not provided, the results will be ordered by the item key.
 // An invalid index will return an error.
-func (tx *Tx) AscendGreaterOrEqual(index, pivot string,
-	iterator func(key, value string) bool) error {
+func (tx *Tx) AscendGreaterOrEqual(
+	index, pivot string,
+	iterator func(key, value string) bool,
+) error {
 	return tx.scan(false, true, false, index, pivot, "", iterator)
 }
 
@@ -1812,8 +1734,10 @@ func (tx *Tx) AscendGreaterOrEqual(index, pivot string,
 // as specified by the less() function of the defined index.
 // When an index is not provided, the results will be ordered by the item key.
 // An invalid index will return an error.
-func (tx *Tx) AscendLessThan(index, pivot string,
-	iterator func(key, value string) bool) error {
+func (tx *Tx) AscendLessThan(
+	index, pivot string,
+	iterator func(key, value string) bool,
+) error {
 	return tx.scan(false, false, true, index, pivot, "", iterator)
 }
 
@@ -1823,8 +1747,10 @@ func (tx *Tx) AscendLessThan(index, pivot string,
 // as specified by the less() function of the defined index.
 // When an index is not provided, the results will be ordered by the item key.
 // An invalid index will return an error.
-func (tx *Tx) AscendRange(index, greaterOrEqual, lessThan string,
-	iterator func(key, value string) bool) error {
+func (tx *Tx) AscendRange(
+	index, greaterOrEqual, lessThan string,
+	iterator func(key, value string) bool,
+) error {
 	return tx.scan(
 		false, true, true, index, greaterOrEqual, lessThan, iterator,
 	)
@@ -1836,8 +1762,10 @@ func (tx *Tx) AscendRange(index, greaterOrEqual, lessThan string,
 // as specified by the less() function of the defined index.
 // When an index is not provided, the results will be ordered by the item key.
 // An invalid index will return an error.
-func (tx *Tx) Descend(index string,
-	iterator func(key, value string) bool) error {
+func (tx *Tx) Descend(
+	index string,
+	iterator func(key, value string) bool,
+) error {
 	return tx.scan(true, false, false, index, "", "", iterator)
 }
 
@@ -1847,8 +1775,10 @@ func (tx *Tx) Descend(index string,
 // as specified by the less() function of the defined index.
 // When an index is not provided, the results will be ordered by the item key.
 // An invalid index will return an error.
-func (tx *Tx) DescendGreaterThan(index, pivot string,
-	iterator func(key, value string) bool) error {
+func (tx *Tx) DescendGreaterThan(
+	index, pivot string,
+	iterator func(key, value string) bool,
+) error {
 	return tx.scan(true, true, false, index, pivot, "", iterator)
 }
 
@@ -1858,8 +1788,10 @@ func (tx *Tx) DescendGreaterThan(index, pivot string,
 // as specified by the less() function of the defined index.
 // When an index is not provided, the results will be ordered by the item key.
 // An invalid index will return an error.
-func (tx *Tx) DescendLessOrEqual(index, pivot string,
-	iterator func(key, value string) bool) error {
+func (tx *Tx) DescendLessOrEqual(
+	index, pivot string,
+	iterator func(key, value string) bool,
+) error {
 	return tx.scan(true, false, true, index, pivot, "", iterator)
 }
 
@@ -1869,8 +1801,10 @@ func (tx *Tx) DescendLessOrEqual(index, pivot string,
 // as specified by the less() function of the defined index.
 // When an index is not provided, the results will be ordered by the item key.
 // An invalid index will return an error.
-func (tx *Tx) DescendRange(index, lessOrEqual, greaterThan string,
-	iterator func(key, value string) bool) error {
+func (tx *Tx) DescendRange(
+	index, lessOrEqual, greaterThan string,
+	iterator func(key, value string) bool,
+) error {
 	return tx.scan(
 		true, true, true, index, lessOrEqual, greaterThan, iterator,
 	)
@@ -1882,8 +1816,10 @@ func (tx *Tx) DescendRange(index, lessOrEqual, greaterThan string,
 // as specified by the less() function of the defined index.
 // When an index is not provided, the results will be ordered by the item key.
 // An invalid index will return an error.
-func (tx *Tx) AscendEqual(index, pivot string,
-	iterator func(key, value string) bool) error {
+func (tx *Tx) AscendEqual(
+	index, pivot string,
+	iterator func(key, value string) bool,
+) error {
 	var err error
 	var less func(a, b string) bool
 	if index != "" {
@@ -1910,8 +1846,10 @@ func (tx *Tx) AscendEqual(index, pivot string,
 // as specified by the less() function of the defined index.
 // When an index is not provided, the results will be ordered by the item key.
 // An invalid index will return an error.
-func (tx *Tx) DescendEqual(index, pivot string,
-	iterator func(key, value string) bool) error {
+func (tx *Tx) DescendEqual(
+	index, pivot string,
+	iterator func(key, value string) bool,
+) error {
 	var err error
 	var less func(a, b string) bool
 	if index != "" {
@@ -1930,94 +1868,6 @@ func (tx *Tx) DescendEqual(index, pivot string,
 		}
 		return iterator(key, value)
 	})
-}
-
-// rect is used by Intersects and Nearby
-type rect struct {
-	min, max []float64
-}
-
-func (r *rect) Rect(ctx interface{}) (min, max []float64) {
-	return r.min, r.max
-}
-
-// Nearby searches for rectangle items that are nearby a target rect.
-// All items belonging to the specified index will be returned in order of
-// nearest to farthest.
-// The specified index must have been created by AddIndex() and the target
-// is represented by the rect string. This string will be processed by the
-// same bounds function that was passed to the CreateSpatialIndex() function.
-// An invalid index will return an error.
-// The dist param is the distance of the bounding boxes. In the case of
-// simple 2D points, it's the distance of the two 2D points squared.
-func (tx *Tx) Nearby(index, bounds string,
-	iterator func(key, value string, dist float64) bool) error {
-	if tx.db == nil {
-		return ErrTxClosed
-	}
-	if index == "" {
-		// cannot search on keys tree. just return nil.
-		return nil
-	}
-	// // wrap a rtree specific iterator around the user-defined iterator.
-	iter := func(item rtred.Item, dist float64) bool {
-		dbi := item.(*dbItem)
-		return iterator(dbi.key, dbi.val, dist)
-	}
-	idx := tx.db.idxs[index]
-	if idx == nil {
-		// index was not found. return error
-		return ErrNotFound
-	}
-	if idx.rtr == nil {
-		// not an r-tree index. just return nil
-		return nil
-	}
-	// execute the nearby search
-	var min, max []float64
-	if idx.rect != nil {
-		min, max = idx.rect(bounds)
-	}
-	// set the center param to false, which uses the box dist calc.
-	idx.rtr.KNN(&rect{min, max}, false, iter)
-	return nil
-}
-
-// Intersects searches for rectangle items that intersect a target rect.
-// The specified index must have been created by AddIndex() and the target
-// is represented by the rect string. This string will be processed by the
-// same bounds function that was passed to the CreateSpatialIndex() function.
-// An invalid index will return an error.
-func (tx *Tx) Intersects(index, bounds string,
-	iterator func(key, value string) bool) error {
-	if tx.db == nil {
-		return ErrTxClosed
-	}
-	if index == "" {
-		// cannot search on keys tree. just return nil.
-		return nil
-	}
-	// wrap a rtree specific iterator around the user-defined iterator.
-	iter := func(item rtred.Item) bool {
-		dbi := item.(*dbItem)
-		return iterator(dbi.key, dbi.val)
-	}
-	idx := tx.db.idxs[index]
-	if idx == nil {
-		// index was not found. return error
-		return ErrNotFound
-	}
-	if idx.rtr == nil {
-		// not an r-tree index. just return nil
-		return nil
-	}
-	// execute the search
-	var min, max []float64
-	if idx.rect != nil {
-		min, max = idx.rect(bounds)
-	}
-	idx.rtr.Search(&rect{min, max}, iter)
-	return nil
 }
 
 // Len returns the number of items in the database
@@ -2051,16 +1901,20 @@ type IndexOptions struct {
 // less function to handle the content format and comparison.
 // There are some default less function that can be used such as
 // IndexString, IndexBinary, etc.
-func (tx *Tx) CreateIndex(name, pattern string,
-	less ...func(a, b string) bool) error {
+func (tx *Tx) CreateIndex(
+	name, pattern string,
+	less ...func(a, b string) bool,
+) error {
 	return tx.createIndex(name, pattern, less, nil, nil)
 }
 
 // CreateIndexOptions is the same as CreateIndex except that it allows
 // for additional options.
-func (tx *Tx) CreateIndexOptions(name, pattern string,
+func (tx *Tx) CreateIndexOptions(
+	name, pattern string,
 	opts *IndexOptions,
-	less ...func(a, b string) bool) error {
+	less ...func(a, b string) bool,
+) error {
 	return tx.createIndex(name, pattern, less, nil, opts)
 }
 
@@ -2078,21 +1932,26 @@ func (tx *Tx) CreateIndexOptions(name, pattern string,
 // Thus min[0] must be less-than-or-equal-to max[0].
 // The IndexRect is a default function that can be used for the rect
 // parameter.
-func (tx *Tx) CreateSpatialIndex(name, pattern string,
-	rect func(item string) (min, max []float64)) error {
+func (tx *Tx) CreateSpatialIndex(
+	name, pattern string,
+	rect func(item string) (min, max []float64),
+) error {
 	return tx.createIndex(name, pattern, nil, rect, nil)
 }
 
 // CreateSpatialIndexOptions is the same as CreateSpatialIndex except that
 // it allows for additional options.
-func (tx *Tx) CreateSpatialIndexOptions(name, pattern string,
+func (tx *Tx) CreateSpatialIndexOptions(
+	name, pattern string,
 	opts *IndexOptions,
-	rect func(item string) (min, max []float64)) error {
+	rect func(item string) (min, max []float64),
+) error {
 	return tx.createIndex(name, pattern, nil, rect, nil)
 }
 
 // createIndex is called by CreateIndex() and CreateSpatialIndex()
-func (tx *Tx) createIndex(name string, pattern string,
+func (tx *Tx) createIndex(
+	name string, pattern string,
 	lessers []func(a, b string) bool,
 	rect func(item string) (min, max []float64),
 	opts *IndexOptions,
@@ -2148,7 +2007,6 @@ func (tx *Tx) createIndex(name string, pattern string,
 		name:    name,
 		pattern: pattern,
 		less:    less,
-		rect:    rect,
 		db:      tx.db,
 		opts:    sopts,
 	}
@@ -2208,28 +2066,6 @@ func (tx *Tx) Indexes() ([]string, error) {
 	}
 	sort.Strings(names)
 	return names, nil
-}
-
-// Rect is helper function that returns a string representation
-// of a rect. IndexRect() is the reverse function and can be used
-// to generate a rect from a string.
-func Rect(min, max []float64) string {
-	r := grect.Rect{Min: min, Max: max}
-	return r.String()
-}
-
-// Point is a helper function that converts a series of float64s
-// to a rectangle for a spatial index.
-func Point(coords ...float64) string {
-	return Rect(coords, coords)
-}
-
-// IndexRect is a helper function that converts string to a rect.
-// Rect() is the reverse function and can be used to generate a string
-// from a rect.
-func IndexRect(a string) (min, max []float64) {
-	r := grect.Get(a)
-	return r.Min, r.Max
 }
 
 // IndexString is a helper function that return true if 'a' is less than 'b'.
@@ -2341,7 +2177,8 @@ func btreeAscend(tr *btree.BTree, iter func(item interface{}) bool) {
 	tr.Ascend(nil, iter)
 }
 
-func btreeAscendLessThan(tr *btree.BTree, pivot interface{},
+func btreeAscendLessThan(
+	tr *btree.BTree, pivot interface{},
 	iter func(item interface{}) bool,
 ) {
 	tr.Ascend(nil, func(item interface{}) bool {
@@ -2349,13 +2186,15 @@ func btreeAscendLessThan(tr *btree.BTree, pivot interface{},
 	})
 }
 
-func btreeAscendGreaterOrEqual(tr *btree.BTree, pivot interface{},
+func btreeAscendGreaterOrEqual(
+	tr *btree.BTree, pivot interface{},
 	iter func(item interface{}) bool,
 ) {
 	tr.Ascend(pivot, iter)
 }
 
-func btreeAscendRange(tr *btree.BTree, greaterOrEqual, lessThan interface{},
+func btreeAscendRange(
+	tr *btree.BTree, greaterOrEqual, lessThan interface{},
 	iter func(item interface{}) bool,
 ) {
 	tr.Ascend(greaterOrEqual, func(item interface{}) bool {
@@ -2369,7 +2208,8 @@ func btreeDescend(tr *btree.BTree, iter func(item interface{}) bool) {
 	tr.Descend(nil, iter)
 }
 
-func btreeDescendGreaterThan(tr *btree.BTree, pivot interface{},
+func btreeDescendGreaterThan(
+	tr *btree.BTree, pivot interface{},
 	iter func(item interface{}) bool,
 ) {
 	tr.Descend(nil, func(item interface{}) bool {
@@ -2377,7 +2217,8 @@ func btreeDescendGreaterThan(tr *btree.BTree, pivot interface{},
 	})
 }
 
-func btreeDescendRange(tr *btree.BTree, lessOrEqual, greaterThan interface{},
+func btreeDescendRange(
+	tr *btree.BTree, lessOrEqual, greaterThan interface{},
 	iter func(item interface{}) bool,
 ) {
 	tr.Descend(lessOrEqual, func(item interface{}) bool {
@@ -2385,7 +2226,8 @@ func btreeDescendRange(tr *btree.BTree, lessOrEqual, greaterThan interface{},
 	})
 }
 
-func btreeDescendLessOrEqual(tr *btree.BTree, pivot interface{},
+func btreeDescendLessOrEqual(
+	tr *btree.BTree, pivot interface{},
 	iter func(item interface{}) bool,
 ) {
 	tr.Descend(pivot, iter)

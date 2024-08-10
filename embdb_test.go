@@ -1,4 +1,4 @@
-package buntdb
+package embdb
 
 import (
 	"bytes"
@@ -921,99 +921,6 @@ func TestVariousTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// test some spatial stuff
-	if err := db.CreateSpatialIndex("spat", "rect:*", IndexRect); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.CreateSpatialIndex("junk", "rect:*", nil); err != nil {
-		t.Fatal(err)
-	}
-	err = db.Update(func(tx *Tx) error {
-		rect, err := tx.GetRect("spat")
-		if err != nil {
-			return err
-		}
-		if rect == nil {
-			t.Fatal("expecting a rect function, got nil")
-		}
-		rect, err = tx.GetRect("junk")
-		if err != ErrNotFound {
-			t.Fatalf("expecting a not found, got %v", err)
-		}
-		if rect != nil {
-			t.Fatal("expecting nil, got a rect function")
-		}
-		rect, err = tx.GetRect("na")
-		if err != ErrNotFound {
-			t.Fatalf("expecting a not found, got %v", err)
-		}
-		if rect != nil {
-			t.Fatal("expecting nil, got a rect function")
-		}
-		if _, _, err := tx.Set("rect:1", "[10 10],[20 20]", nil); err != nil {
-			return err
-		}
-		if _, _, err := tx.Set("rect:2", "[15 15],[25 25]", nil); err != nil {
-			return err
-		}
-		if _, _, err := tx.Set("shape:1", "[12 12],[25 25]", nil); err != nil {
-			return err
-		}
-		s := ""
-		err = tx.Intersects("spat", "[5 5],[13 13]", func(key, val string) bool {
-			s += key + ":" + val + "\n"
-			return true
-		})
-		if err != nil {
-			return err
-		}
-		if s != "rect:1:[10 10],[20 20]\n" {
-			t.Fatal("invalid scan")
-		}
-		tx.db = nil
-		err = tx.Intersects("spat", "[5 5],[13 13]", func(key, val string) bool {
-			return true
-		})
-		if err != ErrTxClosed {
-			t.Fatal("expecting tx closed error")
-		}
-		tx.db = db
-		err = tx.Intersects("", "[5 5],[13 13]", func(key, val string) bool {
-			return true
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = tx.Intersects("na", "[5 5],[13 13]", func(key, val string) bool {
-			return true
-		})
-		if err != ErrNotFound {
-			t.Fatal("expecting not found error")
-		}
-		err = tx.Intersects("junk", "[5 5],[13 13]", func(key, val string) bool {
-			return true
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		n, err := tx.Len()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if n != 5 {
-			t.Fatalf("expecting %v, got %v", 5, n)
-		}
-		tx.db = nil
-		_, err = tx.Len()
-		if err != ErrTxClosed {
-			t.Fatal("expecting tx closed error")
-		}
-		tx.db = db
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	// test after closing
 	if err := db.Close(); err != nil {
 		t.Fatal(err)
@@ -1021,46 +928,6 @@ func TestVariousTx(t *testing.T) {
 
 	if err := db.Update(func(tx *Tx) error { return nil }); err != ErrDatabaseClosed {
 		t.Fatalf("should not be able to perform transactionso on a closed database.")
-	}
-}
-
-func TestNearby(t *testing.T) {
-	rand.Seed(time.Now().UnixNano())
-	N := 100000
-	db, _ := Open(":memory:")
-	db.CreateSpatialIndex("points", "*", IndexRect)
-	db.Update(func(tx *Tx) error {
-		for i := 0; i < N; i++ {
-			p := Point(
-				rand.Float64()*100,
-				rand.Float64()*100,
-				rand.Float64()*100,
-				rand.Float64()*100,
-			)
-			tx.Set(fmt.Sprintf("p:%d", i), p, nil)
-		}
-		return nil
-	})
-	var keys, values []string
-	var dists []float64
-	var pdist float64
-	var i int
-	db.View(func(tx *Tx) error {
-		tx.Nearby("points", Point(0, 0, 0, 0), func(key, value string, dist float64) bool {
-			if i != 0 && dist < pdist {
-				t.Fatal("out of order")
-			}
-			keys = append(keys, key)
-			values = append(values, value)
-			dists = append(dists, dist)
-			pdist = dist
-			i++
-			return true
-		})
-		return nil
-	})
-	if len(keys) != N {
-		t.Fatalf("expected '%v', got '%v'", N, len(keys))
 	}
 }
 
@@ -1292,9 +1159,6 @@ func TestNoExpiringItem(t *testing.T) {
 	if !item.expiresAt().Equal(maxTime) {
 		t.Fatal("item.expiresAt() != maxTime")
 	}
-	if min, max := item.Rect(nil); min != nil || max != nil {
-		t.Fatal("item min,max should both be nil")
-	}
 }
 func TestAutoShrink(t *testing.T) {
 	db := testOpen(t)
@@ -1453,9 +1317,7 @@ func TestInsertsAndDeleted(t *testing.T) {
 	if err := db.CreateIndex("any", "*", IndexString); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.CreateSpatialIndex("rect", "*", IndexRect); err != nil {
-		t.Fatal(err)
-	}
+
 	if err := db.Update(func(tx *Tx) error {
 		if _, _, err := tx.Set("item1", "value1", &SetOptions{Expires: true, TTL: time.Second}); err != nil {
 			return err
@@ -1573,18 +1435,7 @@ func TestIndexCompare(t *testing.T) {
 	if IndexString("Hello", "gello") {
 		t.Fatalf("expected false, got true")
 	}
-	if Rect(IndexRect("[1 2 3 4],[5 6 7 8]")) != "[1 2 3 4],[5 6 7 8]" {
-		t.Fatalf("expected '%v', got '%v'", "[1 2 3 4],[5 6 7 8]", Rect(IndexRect("[1 2 3 4],[5 6 7 8]")))
-	}
-	if Rect(IndexRect("[1 2 3 4]")) != "[1 2 3 4]" {
-		t.Fatalf("expected '%v', got '%v'", "[1 2 3 4]", Rect(IndexRect("[1 2 3 4]")))
-	}
-	if Rect(nil, nil) != "[]" {
-		t.Fatalf("expected '%v', got '%v'", "", Rect(nil, nil))
-	}
-	if Point(1, 2, 3) != "[1 2 3]" {
-		t.Fatalf("expected '%v', got '%v'", "[1 2 3]", Point(1, 2, 3))
-	}
+
 }
 
 // test opening a folder.
@@ -1796,12 +1647,6 @@ func TestVariousIndexOperations(t *testing.T) {
 		if _, _, err := tx.Set("alt:2", "there", nil); err != nil {
 			return err
 		}
-		if _, _, err := tx.Set("rect:1", "[1 2],[3 4]", nil); err != nil {
-			return err
-		}
-		if _, _, err := tx.Set("rect:2", "[5 6],[7 8]", nil); err != nil {
-			return err
-		}
 		return nil
 	})
 	if err != nil {
@@ -1811,10 +1656,7 @@ func TestVariousIndexOperations(t *testing.T) {
 	if err := db.CreateIndex("string", "user:*", IndexString); err != nil {
 		t.Fatal(err)
 	}
-	// test creating a spatial index after adding items. use pattern matching. have some items in the match and some not.
-	if err := db.CreateSpatialIndex("rect", "rect:*", IndexRect); err != nil {
-		t.Fatal(err)
-	}
+
 	// test dropping an index
 	if err := db.DropIndex("hello"); err != nil {
 		t.Fatal(err)
@@ -1827,14 +1669,7 @@ func TestVariousIndexOperations(t *testing.T) {
 	if err := db.DropIndex("na"); err == nil {
 		t.Fatal("should not be allowed to drop an index that does not exist")
 	}
-	// test retrieving index names
-	names, err := db.Indexes()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Join(names, ",") != "rect,string" {
-		t.Fatalf("expecting '%v', got '%v'", "rect,string", strings.Join(names, ","))
-	}
+
 	// test creating an index after closing database
 	if err := db.Close(); err != nil {
 		t.Fatal(err)
@@ -1868,10 +1703,6 @@ func TestBasic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// create a spatial index
-	if err := db.CreateSpatialIndex("rects", "rect:*", IndexRect); err != nil {
-		t.Fatal(err)
-	}
 	if true {
 		err := db.Update(func(tx *Tx) error {
 			if _, _, err := tx.Set("fun:user:0", "tom", nil); err != nil {
@@ -1915,21 +1746,6 @@ func TestBasic(t *testing.T) {
 		if false {
 			println(time.Since(start).String(), db.keys.Len())
 		}
-		// add some random rects
-		if err := db.Update(func(tx *Tx) error {
-			if _, _, err := tx.Set("rect:1", Rect([]float64{10, 10}, []float64{20, 20}), nil); err != nil {
-				return err
-			}
-			if _, _, err := tx.Set("rect:2", Rect([]float64{15, 15}, []float64{24, 24}), nil); err != nil {
-				return err
-			}
-			if _, _, err := tx.Set("rect:3", Rect([]float64{17, 17}, []float64{27, 27}), nil); err != nil {
-				return err
-			}
-			return nil
-		}); err != nil {
-			t.Fatal(err)
-		}
 	}
 	// verify the data has been created
 	buf := &bytes.Buffer{}
@@ -1952,36 +1768,11 @@ func TestBasic(t *testing.T) {
 			fmt.Fprintf(buf, "%s\n", key)
 			return true
 		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = tx.AscendGreaterOrEqual("", "rect:", func(key, val string) bool {
-			if !strings.HasPrefix(key, "rect:") {
-				return false
-			}
-			min, max := IndexRect(val)
-			fmt.Fprintf(buf, "%s: %v,%v\n", key, min, max)
-			return true
-		})
+
 		if err != nil {
 			t.Fatal(err)
 		}
 		expect := make([]string, 2)
-		n := 0
-		err = tx.Intersects("rects", "[0 0],[15 15]", func(key, val string) bool {
-			if n == 2 {
-				t.Fatalf("too many rects where received, expecting only two")
-			}
-			min, max := IndexRect(val)
-			s := fmt.Sprintf("%s: %v,%v\n", key, min, max)
-			if key == "rect:1" {
-				expect[0] = s
-			} else if key == "rect:2" {
-				expect[1] = s
-			}
-			n++
-			return true
-		})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2010,11 +1801,6 @@ tag:196
 tag:197
 tag:198
 tag:199
-rect:1: [10 10],[20 20]
-rect:2: [15 15],[24 24]
-rect:3: [17 17],[27 27]
-rect:1: [10 10],[20 20]
-rect:2: [15 15],[24 24]
 `
 	res = strings.Replace(res, "\r", "", -1)
 	if strings.TrimSpace(buf.String()) != strings.TrimSpace(res) {
@@ -2100,52 +1886,6 @@ usr:3 7
 	s2 := strings.TrimSpace(res)
 	if s1 != s2 {
 		t.Fatalf("expected [%v], got [%v]", s1, s2)
-	}
-}
-
-func testRectStringer(min, max []float64) error {
-	nmin, nmax := IndexRect(Rect(min, max))
-	if len(nmin) != len(min) {
-		return fmt.Errorf("rect=%v,%v, expect=%v,%v", nmin, nmax, min, max)
-	}
-	for i := 0; i < len(min); i++ {
-		if min[i] != nmin[i] || max[i] != nmax[i] {
-			return fmt.Errorf("rect=%v,%v, expect=%v,%v", nmin, nmax, min, max)
-		}
-	}
-	return nil
-}
-func TestRectStrings(t *testing.T) {
-	test(t, Rect(IndexRect(Point(1))) == "[1]", true)
-	test(t, Rect(IndexRect(Point(1, 2, 3, 4))) == "[1 2 3 4]", true)
-	test(t, Rect(IndexRect(Rect(IndexRect("[1 2],[1 2]")))) == "[1 2]", true)
-	test(t, Rect(IndexRect(Rect(IndexRect("[1 2],[2 2]")))) == "[1 2],[2 2]", true)
-	test(t, Rect(IndexRect(Rect(IndexRect("[1 2],[2 2],[3]")))) == "[1 2],[2 2]", true)
-	test(t, Rect(IndexRect(Rect(IndexRect("[1 2]")))) == "[1 2]", true)
-	test(t, Rect(IndexRect(Rect(IndexRect("[1.5 2 4.5 5.6]")))) == "[1.5 2 4.5 5.6]", true)
-	test(t, Rect(IndexRect(Rect(IndexRect("[1.5 2 4.5 5.6 -1],[]")))) == "[1.5 2 4.5 5.6 -1]", true)
-	test(t, Rect(IndexRect(Rect(IndexRect("[]")))) == "[]", true)
-	test(t, Rect(IndexRect(Rect(IndexRect("")))) == "[]", true)
-	if err := testRectStringer(nil, nil); err != nil {
-		t.Fatal(err)
-	}
-	if err := testRectStringer([]float64{}, []float64{}); err != nil {
-		t.Fatal(err)
-	}
-	if err := testRectStringer([]float64{1}, []float64{2}); err != nil {
-		t.Fatal(err)
-	}
-	if err := testRectStringer([]float64{1, 2}, []float64{3, 4}); err != nil {
-		t.Fatal(err)
-	}
-	if err := testRectStringer([]float64{1, 2, 3}, []float64{4, 5, 6}); err != nil {
-		t.Fatal(err)
-	}
-	if err := testRectStringer([]float64{1, 2, 3, 4}, []float64{5, 6, 7, 8}); err != nil {
-		t.Fatal(err)
-	}
-	if err := testRectStringer([]float64{1, 2, 3, 4, 5}, []float64{6, 7, 8, 9, 10}); err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -2283,10 +2023,12 @@ func benchClose(t *testing.B, persist bool, db *DB) {
 	}
 }
 
-func benchOpenFillData(t *testing.B, N int,
+func benchOpenFillData(
+	t *testing.B, N int,
 	set, persist, random bool,
 	geo bool,
-	batch int) (db *DB, keys, vals []string) {
+	batch int,
+) (db *DB, keys, vals []string) {
 	///
 	t.StopTimer()
 	rand.Seed(time.Now().UnixNano())
@@ -2497,15 +2239,6 @@ func Benchmark_Descend_1000(t *testing.B) {
 func Benchmark_Descend_10000(t *testing.B) {
 	benchScan(t, false, 10000)
 }
-
-/*
-	func Benchmark_Spatial_2D(t *testing.B) {
-		N := 100000
-		db, _, _ := benchOpenFillData(t, N, true, true, false, true, 100)
-		defer benchClose(t, false, db)
-
-}
-*/
 func TestCoverCloseAlreadyClosed(t *testing.T) {
 	db := testOpen(t)
 	defer testClose(db)
