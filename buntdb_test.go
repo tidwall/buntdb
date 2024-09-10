@@ -46,7 +46,7 @@ func testClose(db *DB) {
 	_ = os.RemoveAll("data.db")
 }
 
-func TestBackgroudOperations(t *testing.T) {
+func TestBackgroundOperations(t *testing.T) {
 	db := testOpen(t)
 	defer testClose(db)
 	for i := 0; i < 1000; i++ {

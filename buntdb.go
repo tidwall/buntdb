@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -753,7 +754,7 @@ func (db *DB) Shrink() error {
 			return err
 		}
 		// Any failures below here are really bad. So just panic.
-		if err := os.Rename(tmpname, fname); err != nil {
+		if err := renameFile(tmpname, fname); err != nil {
 			panicErr(err)
 		}
 		db.file, err = os.OpenFile(fname, os.O_CREATE|os.O_RDWR, 0666)
@@ -771,6 +772,18 @@ func (db *DB) Shrink() error {
 
 func panicErr(err error) error {
 	panic(fmt.Errorf("buntdb: %w", err))
+}
+
+func renameFile(src, dest string) error {
+	var err error
+	if err = os.Rename(src, dest); err != nil {
+		if runtime.GOOS == "windows" {
+			if err = os.Remove(dest); err == nil {
+				err = os.Rename(src, dest)
+			}
+		}
+	}
+	return err
 }
 
 // readLoad reads from the reader and loads commands into the database.
