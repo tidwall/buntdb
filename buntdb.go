@@ -129,7 +129,7 @@ type Config struct {
 	// OnExpiredSync will be called inside the same transaction that is
 	// performing the deletion of expired items. If OnExpired is present then
 	// this callback will not be called. If this callback is present, then the
-	// deletion of the timeed-out item is the explicit responsibility of this
+	// deletion of the timed-out item is the explicit responsibility of this
 	// callback.
 	OnExpiredSync func(key, value string, tx *Tx) error
 }
