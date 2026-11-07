@@ -747,6 +747,9 @@ func (db *DB) Shrink() error {
 		if err := aof.Close(); err != nil {
 			return err
 		}
+		if err := f.Sync(); err != nil {
+			return err
+		}
 		if err := f.Close(); err != nil {
 			return err
 		}
